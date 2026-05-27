@@ -21,6 +21,14 @@ def launch_app():
     root.geometry("440x640")
     root.resizable(False, False)
 
+    # 窗口图标
+    icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icon.ico")
+    if os.path.exists(icon_path):
+        try:
+            root.iconbitmap(icon_path)
+        except Exception:
+            pass
+
     def go_main(user_info):
         for w in root.winfo_children():
             w.destroy()
