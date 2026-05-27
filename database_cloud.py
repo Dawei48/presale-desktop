@@ -9,8 +9,7 @@ from datetime import datetime
 from supabase import create_client, Client
 
 # ── 配置 ──────────────────────────────────────
-SUPABASE_URL = "https://xhcbsvfysuxqzfudkkwl.supabase.co"
-SUPABASE_KEY = "sb_publishable_CqIEa-ijlbZ3SbbEYXrTsQ_ZRR91HtB"
+from config import SUPABASE_URL, SUPABASE_KEY
 STORAGE_BUCKET = "product-images"
 
 
@@ -120,10 +119,21 @@ class Database:
         return res.data
 
     def search_products(self, keyword):
-        # Supabase ilike 搜索
+        # 先按产品名和备注搜
         res = self.client.table("products").select("*, brands(name)").or_(
             f"name.ilike.%{keyword}%,notes.ilike.%{keyword}%"
         ).order("created_at", desc=True).execute()
+        # 再按品牌名搜（Supabase不支持跨表or，单独查）
+        brand_res = self.client.table("brands").select("id").ilike("name", f"%{keyword}%").execute()
+        if brand_res.data:
+            brand_ids = [b["id"] for b in brand_res.data]
+            for bid in brand_ids:
+                extra = self.client.table("products").select("*, brands(name)").eq("brand_id", bid).execute()
+                # 去重合并
+                existing_ids = {p["id"] for p in res.data}
+                for p in extra.data:
+                    if p["id"] not in existing_ids:
+                        res.data.append(p)
         for p in res.data:
             if "brands" in p and p["brands"]:
                 p["brand_name"] = p["brands"]["name"]
@@ -168,9 +178,12 @@ class Database:
         query = self.client.table("orders").select("*, products(name,price,image_path,brand_id)")
         if product_id:
             query = query.eq("product_id", product_id)
+        if brand_id:
+            query = query.eq("products.brand_id", brand_id)
         if status:
             query = query.eq("status", status)
         if keyword:
+            # 需要分别搜订单字段和产品名，用in_语法不太方便，先搜订单字段
             query = query.or_(
                 f"order_no.ilike.%{keyword}%,customer.ilike.%{keyword}%,notes.ilike.%{keyword}%"
             )
@@ -265,7 +278,7 @@ class Database:
         filename = f"{uuid.uuid4().hex[:12]}{ext}"
         with open(local_path, "rb") as f:
             self.client.storage.from_(STORAGE_BUCKET).upload(filename, f, {
-                "content-type": f"image/{ext.lstrip('.')}",
+                "content-type": "image/jpeg" if ext in (".jpg", ".jpeg") else f"image/{ext.lstrip('.')}",
                 "upsert": "false",
             })
         # 返回公开URL

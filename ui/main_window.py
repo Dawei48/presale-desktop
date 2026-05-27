@@ -209,7 +209,7 @@ class MainWindow(ctk.CTkFrame):
             self.master.minsize(100, 100)
             self.master.resizable(False, False)
             from ui.login_window import LoginWindow
-            LoginWindow(self.master, on_success=self._go_main).pack(fill="both", expand=True)
+            LoginWindow(self.master, on_success=self._go_main, db=self.db).pack(fill="both", expand=True)
 
     def _go_main(self, user_info):
         for w in self.master.winfo_children():

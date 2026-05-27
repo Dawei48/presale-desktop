@@ -60,10 +60,10 @@ def launch_app():
 
     if db.has_users():
         from ui.login_window import LoginWindow
-        LoginWindow(root, on_success=go_main).pack(fill="both", expand=True)
+        LoginWindow(root, on_success=go_main, db=db).pack(fill="both", expand=True)
     else:
         from ui.login_window import SetupWindow
-        SetupWindow(root, on_done=go_main).pack(fill="both", expand=True)
+        SetupWindow(root, on_done=go_main, db=db).pack(fill="both", expand=True)
 
     root.mainloop()
 

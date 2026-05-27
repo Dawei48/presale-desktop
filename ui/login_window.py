@@ -26,7 +26,7 @@ def _load_logo():
 class SetupWindow(ctk.CTkFrame):
     """首次使用 - 创建管理员账号"""
 
-    def __init__(self, parent, on_done):
+    def __init__(self, parent, on_done, db=None):
         super().__init__(parent, fg_color=Colors.BG_MAIN)
         self.on_done = on_done
 
@@ -91,10 +91,9 @@ class SetupWindow(ctk.CTkFrame):
     def _go_login(self):
         for w in self.master.winfo_children():
             w.destroy()
-        LoginWindow(self.master, on_success=self.on_done).pack(fill="both", expand=True)
+        LoginWindow(self.master, on_success=self.on_done, db=self._db).pack(fill="both", expand=True)
 
     def _do_setup(self):
-        from database import Database
         username = self.entry_user.get().strip()
         display_name = self.entry_name.get().strip()
         password = self.entry_pass.get().strip()
@@ -106,7 +105,7 @@ class SetupWindow(ctk.CTkFrame):
             self.lbl_error.configure(text="密码至少4位")
             return
 
-        db = Database()
+        db = self._db
         if db.user_exists(username):
             self.lbl_error.configure(text="用户名已存在")
             return
@@ -120,7 +119,7 @@ class SetupWindow(ctk.CTkFrame):
 class LoginWindow(ctk.CTkFrame):
     """正常登录"""
 
-    def __init__(self, parent, on_success):
+    def __init__(self, parent, on_success, db=None):
         super().__init__(parent, fg_color=Colors.BG_MAIN)
         self.on_success = on_success
 
@@ -176,11 +175,10 @@ class LoginWindow(ctk.CTkFrame):
     def _go_setup(self):
         for w in self.master.winfo_children():
             w.destroy()
-        SetupWindow(self.master, on_done=self.on_success).pack(fill="both", expand=True)
+        SetupWindow(self.master, on_done=self.on_success, db=self._db).pack(fill="both", expand=True)
 
     def _do_login(self):
-        from database import Database
-        db = Database()
+        db = self._db
         user = db.login(self.entry_user.get().strip(), self.entry_pass.get().strip())
         if user:
             db.log("登录系统", f"用户 {user['username']} 登录", user["id"], user["username"])

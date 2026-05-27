@@ -55,7 +55,8 @@ def export_brand_orders_docx(brand_name, orders, filepath, title=None):
     section.right_margin = Cm(2)
 
     # Logo + 标题
-    logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "logo.png")
+    from config import BASE_DIR
+    logo_path = os.path.join(BASE_DIR, "assets", "logo.png")
     if os.path.exists(logo_path):
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER

@@ -94,10 +94,8 @@ class ProductDialog(Dialog):
             if USE_CLOUD:
                 # 云端：上传到Supabase Storage
                 try:
-                    from database_cloud import Database
-                    db = Database()
                     Toast(self, "⬆️ 正在上传图片...", "info")
-                    url = db.upload_image(path)
+                    url = self.db.upload_image(path)
                     self.image_path = url
                     self._refresh_preview()
                 except Exception as e:
