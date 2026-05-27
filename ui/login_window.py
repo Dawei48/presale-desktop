@@ -29,6 +29,7 @@ class SetupWindow(ctk.CTkFrame):
     def __init__(self, parent, on_done, db=None):
         super().__init__(parent, fg_color=Colors.BG_MAIN)
         self.on_done = on_done
+        self._db = db
 
         card = ctk.CTkFrame(self, fg_color=Colors.BG_CARD, corner_radius=Radius.XL,
                             border_width=1, border_color=Colors.BORDER,
@@ -127,6 +128,7 @@ class LoginWindow(ctk.CTkFrame):
     def __init__(self, parent, on_success, db=None):
         super().__init__(parent, fg_color=Colors.BG_MAIN)
         self.on_success = on_success
+        self._db = db
 
         card = ctk.CTkFrame(self, fg_color=Colors.BG_CARD, corner_radius=Radius.XL,
                             border_width=1, border_color=Colors.BORDER,
