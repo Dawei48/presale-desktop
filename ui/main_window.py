@@ -197,15 +197,18 @@ class MainWindow(ctk.CTkFrame):
         if d.result:
             self.db.log("退出登录", f"用户 {self.user_info['username']} 退出",
                         self.user_info["id"], self.user_info["username"])
-            # 清空主窗口，回到登录
             for w in self.master.winfo_children():
                 w.destroy()
-            self.master.withdraw()
+            self.master.geometry("440x640")
+            self.master.minsize(100, 100)
+            self.master.resizable(False, False)
             from ui.login_window import LoginWindow
-            LoginWindow(self.master, on_success=self._go_main)
-            self.master.deiconify()
+            LoginWindow(self.master, on_success=self._go_main).pack(fill="both", expand=True)
 
     def _go_main(self, user_info):
         for w in self.master.winfo_children():
             w.destroy()
+        self.master.geometry("1100x700")
+        self.master.minsize(900, 600)
+        self.master.resizable(True, True)
         MainWindow(self.master, user_info)

@@ -14,7 +14,7 @@ class SetupWindow(ctk.CTkFrame):
 
         card = ctk.CTkFrame(self, fg_color=Colors.BG_CARD, corner_radius=Radius.XL,
                             border_width=1, border_color=Colors.BORDER,
-                            width=380, height=420)
+                            width=380, height=540)
         card.place(relx=0.5, rely=0.5, anchor="center")
         card.pack_propagate(False)
 
@@ -59,6 +59,17 @@ class SetupWindow(ctk.CTkFrame):
                       fg_color=Colors.PRIMARY, hover_color=Colors.PRIMARY_HOVER,
                       corner_radius=Radius.SM,
                       command=self._do_setup).pack(fill="x", pady=(0, 0))
+
+        ctk.CTkLabel(card, text="", font=Fonts.SMALL, text_color=Colors.TEXT_MUTED).pack()
+        ctk.CTkButton(card, text="已有账号？去登录", font=Fonts.SMALL,
+                      fg_color=None, hover_color=None,
+                      text_color=Colors.PRIMARY, height=28,
+                      command=self._go_login).pack(pady=(4, 0))
+
+    def _go_login(self):
+        for w in self.master.winfo_children():
+            w.destroy()
+        LoginWindow(self.master, on_success=self.on_done).pack(fill="both", expand=True)
 
     def _do_setup(self):
         from database import Database
@@ -130,6 +141,16 @@ class LoginWindow(ctk.CTkFrame):
         self.lbl_error = ctk.CTkLabel(card, text="", font=Fonts.SMALL,
                                       text_color=Colors.DANGER)
         self.lbl_error.pack(pady=(8, 0))
+
+        ctk.CTkButton(card, text="还没有账号？去注册", font=Fonts.SMALL,
+                      fg_color=None, hover_color=None,
+                      text_color=Colors.PRIMARY, height=28,
+                      command=self._go_setup).pack(pady=(4, 0))
+
+    def _go_setup(self):
+        for w in self.master.winfo_children():
+            w.destroy()
+        SetupWindow(self.master, on_done=self.on_success).pack(fill="both", expand=True)
 
     def _do_login(self):
         from database import Database

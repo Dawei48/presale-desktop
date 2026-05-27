@@ -13,27 +13,29 @@ else:
 
 def launch_app():
     from database import Database
-    from ui.main_window import MainWindow
     import customtkinter as ctk
 
     db = Database()
     root = ctk.CTk()
-    root.withdraw()  # 隐藏主窗口，只用来承载子窗口
+    root.title("放心预")
+    root.geometry("440x640")
+    root.resizable(False, False)
 
     def go_main(user_info):
         for w in root.winfo_children():
             w.destroy()
-        root.deiconify()
+        root.geometry("1100x700")
+        root.minsize(900, 600)
+        root.resizable(True, True)
+        from ui.main_window import MainWindow
         MainWindow(root, user_info)
 
     if db.has_users():
-        # 已有用户 → 登录
         from ui.login_window import LoginWindow
-        LoginWindow(root, on_success=go_main)
+        LoginWindow(root, on_success=go_main).pack(fill="both", expand=True)
     else:
-        # 首次使用 → 注册管理员
         from ui.login_window import SetupWindow
-        SetupWindow(root, on_done=go_main)
+        SetupWindow(root, on_done=go_main).pack(fill="both", expand=True)
 
     root.mainloop()
 
