@@ -350,7 +350,7 @@ class OrdersTab(ctk.CTkFrame):
                 order.get("customer", ""),
                 order.get("product_name", ""),
                 str(order.get("quantity", 0)),
-                order.get("status", "pending"),
+                STATUS_MAP.get(order.get("status", "pending"), ("未知", "", ""))[0],
                 order.get("notes", ""),
                 order.get("created_at", "")[:10],
             ]

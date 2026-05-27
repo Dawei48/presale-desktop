@@ -285,19 +285,17 @@ class ProductsTab(ctk.CTkFrame):
 
     def _go_orders(self, product):
         from ui.orders_tab import OrdersTab
-        # 保存父容器引用
         parent = self.master
         for w in parent.winfo_children():
             w.destroy()
-        # on_back: 重新创建 ProductsTab（用闭包保存所需数据）
         brand = self.brand
         db = self.db
         user = self.current_user
         on_back_main = self.on_back
         OrdersTab(parent, db, user,
                   product=product, brand=brand,
-                  on_back=lambda: ProductsTab(parent, db, user,
-                                              brand, on_back_main)).pack(fill="both", expand=True)
+                  on_back=lambda: (ProductsTab(parent, db, user,
+                                               brand, on_back_main).pack(fill="both", expand=True))).pack(fill="both", expand=True)
 
     def _add(self):
         def on_save(data):

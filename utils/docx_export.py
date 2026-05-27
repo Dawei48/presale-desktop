@@ -17,6 +17,8 @@ from PIL import Image as PILImage
 
 def compress_image(img_path, max_size=(300, 300), quality=60):
     """压缩图片并返回字节流（支持本地路径和URL）"""
+    if not img_path:
+        return None
     try:
         if img_path.startswith("http"):
             import urllib.request
