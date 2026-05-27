@@ -87,11 +87,10 @@ class ProductDialog(Dialog):
             self.entry_price.insert(0, str(product.get("price", 0)))
 
     def _pick_image(self):
-        from config import USE_CLOUD
         filetypes = [("图片", "*.png *.jpg *.jpeg *.gif *.webp"), ("所有文件", "*.*")]
         path = filedialog.askopenfilename(filetypes=filetypes)
         if path:
-            if USE_CLOUD:
+            if hasattr(self.db, 'upload_image'):
                 # 云端：上传到Supabase Storage
                 try:
                     Toast(self, "⬆️ 正在上传图片...", "info")

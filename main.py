@@ -18,24 +18,31 @@ def get_database():
         try:
             from database_cloud import Database
             db = Database()
-            # 测试连接
             db.has_users()
             print("✅ 已连接云端数据库")
-            return db
+            return db, None
         except Exception as e:
-            print(f"⚠️ 云端连接失败({e})，回退到本地数据库")
+            import traceback
+            err = f"{type(e).__name__}: {e}\n{traceback.format_exc()}"
+            print(f"⚠️ 云端连接失败: {err}")
+            # 写到文件方便排查
+            try:
+                with open("cloud_error.log", "w", encoding="utf-8") as f:
+                    f.write(err)
+            except Exception:
+                pass
             from database import Database
-            return Database()
+            return Database(), err
     else:
         from database import Database
-        return Database()
+        return Database(), None
 
 
 def launch_app():
     import customtkinter as ctk
     from config import BASE_DIR
 
-    db = get_database()
+    db, cloud_error = get_database()
     root = ctk.CTk()
     root.title("放心预")
     root.geometry("440x640")
@@ -58,12 +65,15 @@ def launch_app():
         from ui.main_window import MainWindow
         MainWindow(root, user_info, db=db)
 
+    # 云端连接状态
+    mode_label = "🌐 云端模式" if cloud_error is None else "⚠️ 本地模式（云端连接失败）"
+
     if db.has_users():
         from ui.login_window import LoginWindow
-        LoginWindow(root, on_success=go_main, db=db).pack(fill="both", expand=True)
+        LoginWindow(root, on_success=go_main, db=db, mode_label=mode_label).pack(fill="both", expand=True)
     else:
         from ui.login_window import SetupWindow
-        SetupWindow(root, on_done=go_main, db=db).pack(fill="both", expand=True)
+        SetupWindow(root, on_done=go_main, db=db, mode_label=mode_label).pack(fill="both", expand=True)
 
     root.mainloop()
 

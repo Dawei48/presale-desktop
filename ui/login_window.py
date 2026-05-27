@@ -26,7 +26,7 @@ def _load_logo():
 class SetupWindow(ctk.CTkFrame):
     """首次使用 - 创建管理员账号"""
 
-    def __init__(self, parent, on_done, db=None):
+    def __init__(self, parent, on_done, db=None, mode_label=""):
         super().__init__(parent, fg_color=Colors.BG_MAIN)
         self.on_done = on_done
         self._db = db
@@ -92,7 +92,7 @@ class SetupWindow(ctk.CTkFrame):
     def _go_login(self):
         for w in self.master.winfo_children():
             w.destroy()
-        LoginWindow(self.master, on_success=self.on_done, db=self._db).pack(fill="both", expand=True)
+        LoginWindow(self.master, on_success=self.on_done, db=self._db, mode_label=self._mode_label).pack(fill="both", expand=True)
 
     def _do_setup(self):
         username = self.entry_user.get().strip()
@@ -125,7 +125,7 @@ class SetupWindow(ctk.CTkFrame):
 class LoginWindow(ctk.CTkFrame):
     """正常登录"""
 
-    def __init__(self, parent, on_success, db=None):
+    def __init__(self, parent, on_success, db=None, mode_label=""):
         super().__init__(parent, fg_color=Colors.BG_MAIN)
         self.on_success = on_success
         self._db = db
@@ -144,7 +144,11 @@ class LoginWindow(ctk.CTkFrame):
         ctk.CTkLabel(card, text="放心预", font=Fonts.TITLE,
                      text_color=Colors.TEXT_PRIMARY).pack()
         ctk.CTkLabel(card, text="预售管理系统", font=Fonts.SMALL,
-                     text_color=Colors.TEXT_MUTED).pack(pady=(0, 20))
+                     text_color=Colors.TEXT_MUTED).pack(pady=(0, 4))
+        if self._mode_label:
+            color = Colors.SUCCESS if "云端" in self._mode_label else Colors.WARNING
+            ctk.CTkLabel(card, text=self._mode_label, font=Fonts.TINY,
+                         text_color=color).pack(pady=(0, 16))
 
         form = ctk.CTkFrame(card, fg_color="transparent")
         form.pack(fill="x", padx=32)
@@ -182,7 +186,7 @@ class LoginWindow(ctk.CTkFrame):
     def _go_setup(self):
         for w in self.master.winfo_children():
             w.destroy()
-        SetupWindow(self.master, on_done=self.on_success, db=self._db).pack(fill="both", expand=True)
+        SetupWindow(self.master, on_done=self.on_success, db=self._db, mode_label=self._mode_label).pack(fill="both", expand=True)
 
     def _do_login(self):
         try:
