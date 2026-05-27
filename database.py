@@ -279,16 +279,22 @@ class Database:
             ).fetchone()
             return dict(row) if row else None
 
-    def add_order(self, product_id, quantity=1, order_no="", customer="", notes=""):
+    def add_order(self, product_id, quantity=1, order_no="", customer="", notes="", created_at=None):
         with self._conn() as conn:
-            cur = conn.execute(
-                "INSERT INTO orders (product_id, order_no, customer, quantity, notes) VALUES (?,?,?,?,?)",
-                (product_id, order_no, customer, quantity, notes)
-            )
+            if created_at:
+                cur = conn.execute(
+                    "INSERT INTO orders (product_id, order_no, customer, quantity, notes, created_at) VALUES (?,?,?,?,?,?)",
+                    (product_id, order_no, customer, quantity, notes, created_at)
+                )
+            else:
+                cur = conn.execute(
+                    "INSERT INTO orders (product_id, order_no, customer, quantity, notes) VALUES (?,?,?,?,?)",
+                    (product_id, order_no, customer, quantity, notes)
+                )
             return cur.lastrowid
 
     def update_order(self, order_id, **kwargs):
-        allowed = {"product_id", "order_no", "customer", "quantity", "notes", "status"}
+        allowed = {"product_id", "order_no", "customer", "quantity", "notes", "status", "created_at"}
         fields = {k: v for k, v in kwargs.items() if k in allowed and v is not None}
         if not fields:
             return

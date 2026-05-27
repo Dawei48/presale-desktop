@@ -19,10 +19,13 @@ class Colors:
     # 语义色
     SUCCESS       = "#10B981"
     SUCCESS_LIGHT = "#D1FAE5"
+    SUCCESS_HOVER = "#059669"
     WARNING       = "#F59E0B"
     WARNING_LIGHT = "#FEF3C7"
+    WARNING_HOVER = "#D97706"
     DANGER        = "#EF4444"
     DANGER_LIGHT  = "#FEE2E2"
+    DANGER_HOVER  = "#DC2626"
     INFO          = "#6366F1"
     INFO_LIGHT    = "#E0E7FF"
 
@@ -37,6 +40,7 @@ class Colors:
     BG_MAIN       = "#F8FAFC"
     BG_CARD       = "#FFFFFF"
     BG_INPUT      = "#F1F5F9"
+    BG_HOVER      = "#F1F5F9"
 
     # 文字
     TEXT_PRIMARY   = "#0F172A"
@@ -47,6 +51,7 @@ class Colors:
     # 边框
     BORDER        = "#E2E8F0"
     BORDER_FOCUS  = "#2563EB"
+    BORDER_LIGHT  = "#F1F5F9"
 
 # ── 字体 ──────────────────────────────────────
 class Fonts:
