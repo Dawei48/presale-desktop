@@ -45,7 +45,7 @@ def launch_app():
     db, cloud_error = get_database()
     root = ctk.CTk()
     root.title("放心预")
-    root.geometry("440x640")
+    root.geometry("520x720")
     root.resizable(False, False)
 
     # 窗口图标
@@ -60,8 +60,8 @@ def launch_app():
     def go_main(user_info):
         for w in root.winfo_children():
             w.destroy()
-        root.geometry("1100x700")
-        root.minsize(900, 600)
+        root.geometry("1280x800")
+        root.minsize(1000, 650)
         root.resizable(True, True)
         from ui.main_window import MainWindow
         MainWindow(root, user_info, db=db)

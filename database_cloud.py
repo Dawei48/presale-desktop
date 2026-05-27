@@ -9,6 +9,8 @@ import uuid
 import json
 import urllib.request
 import urllib.parse
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from config import SUPABASE_URL, SUPABASE_KEY
 
@@ -177,7 +179,7 @@ class Database:
         if not rows:
             return []
         brand_ids = [b["id"] for b in rows]
-        # ONE call to get all products for these brands
+        # 并行获取品牌和产品计数
         product_counts = _batch_products_for_brands(brand_ids)
         for b in rows:
             b["product_count"] = product_counts.get(b["id"], 0)
@@ -381,11 +383,13 @@ class Database:
     #  统计
     # ════════════════════════════════════════════
     def get_stats(self):
-        brands = _api("brands", count=True)["count"]
-        products = _api("products", count=True)["count"]
-        orders = _api("orders", count=True)["count"]
-        pending = _api("orders", filters={"status": "pending"}, count=True)["count"]
-        shipped = _api("orders", filters={"status": "shipped"}, count=True)["count"]
+        with ThreadPoolExecutor(max_workers=5) as pool:
+            f1 = pool.submit(lambda: _api("brands", count=True)["count"])
+            f2 = pool.submit(lambda: _api("products", count=True)["count"])
+            f3 = pool.submit(lambda: _api("orders", count=True)["count"])
+            f4 = pool.submit(lambda: _api("orders", filters={"status": "pending"}, count=True)["count"])
+            f5 = pool.submit(lambda: _api("orders", filters={"status": "shipped"}, count=True)["count"])
+            brands, products, orders, pending, shipped = f1.result(), f2.result(), f3.result(), f4.result(), f5.result()
         return {
             "brands": brands, "products": products,
             "orders": orders, "pending": pending, "shipped": shipped,

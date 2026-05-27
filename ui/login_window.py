@@ -34,7 +34,7 @@ class SetupWindow(ctk.CTkFrame):
 
         card = ctk.CTkFrame(self, fg_color=Colors.BG_CARD, corner_radius=Radius.XL,
                             border_width=1, border_color=Colors.BORDER,
-                            width=380, height=540)
+                            width=420, height=580)
         card.place(relx=0.5, rely=0.5, anchor="center")
         card.pack_propagate(False)
 
@@ -139,7 +139,7 @@ class LoginWindow(ctk.CTkFrame):
 
         card = ctk.CTkFrame(self, fg_color=Colors.BG_CARD, corner_radius=Radius.XL,
                             border_width=1, border_color=Colors.BORDER,
-                            width=380, height=480)
+                            width=420, height=520)
         card.place(relx=0.5, rely=0.5, anchor="center")
         card.pack_propagate(False)
 
