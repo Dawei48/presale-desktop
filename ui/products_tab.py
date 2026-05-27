@@ -21,7 +21,7 @@ def load_ctk_image(path, size=(64, 64)):
         from customtkinter import CTkImage
         pil_img = PILImage.open(path)
         pil_img.thumbnail(size)
-        ctk_img = CTkImage(light_mode=pil_img, dark_mode=pil_img, size=pil_img.size)
+        ctk_img = CTkImage(light_image=pil_img, dark_image=pil_img, size=pil_img.size)
         return ctk_img, pil_img
     except Exception:
         return None, None
