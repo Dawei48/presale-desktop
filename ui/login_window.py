@@ -75,6 +75,11 @@ class SetupWindow(ctk.CTkFrame):
                                        corner_radius=Radius.SM, show="•")
         self.entry_pass.pack(fill="x", pady=(4, 16))
 
+        # 回车键提交
+        self.entry_pass.bind("<Return>", lambda e: self._do_setup())
+        self.entry_user.bind("<Return>", lambda e: self.entry_name.focus())
+        self.entry_name.bind("<Return>", lambda e: self.entry_pass.focus())
+
         self.lbl_error = ctk.CTkLabel(card, text="", font=Fonts.SMALL,
                                       text_color=Colors.DANGER)
         self.lbl_error.pack()
@@ -134,8 +139,8 @@ class LoginWindow(ctk.CTkFrame):
 
         card = ctk.CTkFrame(self, fg_color=Colors.BG_CARD, corner_radius=Radius.XL,
                             border_width=1, border_color=Colors.BORDER,
-                            width=380, height=380)
-        card.place(relx=0.5, rely=0.45, anchor="center")
+                            width=380, height=480)
+        card.place(relx=0.5, rely=0.5, anchor="center")
         card.pack_propagate(False)
 
         logo = _load_logo()
@@ -170,6 +175,10 @@ class LoginWindow(ctk.CTkFrame):
                                        border_color=Colors.BORDER, fg_color=Colors.BG_INPUT,
                                        corner_radius=Radius.SM, show="•")
         self.entry_pass.pack(fill="x", pady=(4, 16))
+
+        # 回车键登录
+        self.entry_pass.bind("<Return>", lambda e: self._do_login())
+        self.entry_user.bind("<Return>", lambda e: self.entry_pass.focus())
 
         ctk.CTkButton(form, text="登 录", font=Fonts.H2, height=42,
                       fg_color=Colors.PRIMARY, hover_color=Colors.PRIMARY_HOVER,
