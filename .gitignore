@@ -1,0 +1,24 @@
+# 数据库（含个人数据）
+data/
+*.db
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# 打包输出
+dist/
+build/
+*.spec
+
+# IDE
+.vscode/
+.idea/
+
+# 截图/临时文件
+*.png
+*.jpg
+test_gui.py
