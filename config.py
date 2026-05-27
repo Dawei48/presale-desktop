@@ -15,7 +15,9 @@ else:
 
 DATA_DIR = os.path.join(BASE_DIR, "data")
 DB_PATH = os.path.join(DATA_DIR, "presale.db")
+IMAGES_DIR = os.path.join(DATA_DIR, "images")
 os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(IMAGES_DIR, exist_ok=True)
 
 DEFAULT_ADMIN_USER = "admin"
 DEFAULT_ADMIN_PASS = "admin123"

@@ -55,6 +55,7 @@ class Database:
                     name        TEXT NOT NULL,
                     price       REAL DEFAULT 0,
                     notes       TEXT DEFAULT '',
+                    image_path  TEXT DEFAULT '',
                     created_at  TEXT DEFAULT (datetime('now','localtime')),
                     updated_at  TEXT DEFAULT (datetime('now','localtime')),
                     FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
@@ -82,6 +83,12 @@ class Database:
                     created_at TEXT DEFAULT (datetime('now','localtime'))
                 );
             """)
+
+        # 迁移: 给已有数据库加 image_path 列
+        with self._conn() as conn:
+            cols = [r[1] for r in conn.execute("PRAGMA table_info(products)").fetchall()]
+            if "image_path" not in cols:
+                conn.execute("ALTER TABLE products ADD COLUMN image_path TEXT DEFAULT ''")
 
 # 首次安装不再创建默认账号，由用户自己注册管理员
 
@@ -212,16 +219,16 @@ class Database:
             ).fetchone()
             return dict(row) if row else None
 
-    def add_product(self, brand_id, name, price=0, notes=""):
+    def add_product(self, brand_id, name, price=0, notes="", image_path=""):
         with self._conn() as conn:
             cur = conn.execute(
-                "INSERT INTO products (brand_id, name, price, notes) VALUES (?,?,?,?)",
-                (brand_id, name, price, notes)
+                "INSERT INTO products (brand_id, name, price, notes, image_path) VALUES (?,?,?,?,?)",
+                (brand_id, name, price, notes, image_path)
             )
             return cur.lastrowid
 
     def update_product(self, product_id, **kwargs):
-        allowed = {"brand_id", "name", "price", "notes"}
+        allowed = {"brand_id", "name", "price", "notes", "image_path"}
         fields = {k: v for k, v in kwargs.items() if k in allowed and v is not None}
         if not fields:
             return
@@ -239,7 +246,8 @@ class Database:
     # ════════════════════════════════════════════
     def get_orders(self, product_id=None, brand_id=None, status=None, keyword=None):
         with self._conn() as conn:
-            query = """SELECT o.*, p.name as product_name, b.name as brand_name
+            query = """SELECT o.*, p.name as product_name, p.price as product_price,
+                              p.image_path as product_image_path, b.name as brand_name
                        FROM orders o
                        LEFT JOIN products p ON o.product_id=p.id
                        LEFT JOIN brands b ON p.brand_id=b.id

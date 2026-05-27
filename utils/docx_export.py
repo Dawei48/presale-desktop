@@ -1,10 +1,11 @@
 """
 Word 导出 - 按品牌导出所有预售订单
+包含: 产品图片 + 产品名 + 价格 + 预售总数量 + 订单明细表
 """
 import os
 from datetime import datetime
 from docx import Document
-from docx.shared import Pt, Cm, RGBColor
+from docx.shared import Pt, Cm, RGBColor, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml.ns import nsdecls
@@ -77,16 +78,42 @@ def export_brand_orders_docx(brand_name, orders, filepath, title=None):
     for o in orders:
         pname = o.get("product_name", "未知")
         if pname not in products:
-            products[pname] = []
-        products[pname].append(o)
+            products[pname] = {"orders": [], "price": o.get("product_price", 0),
+                               "image_path": o.get("product_image_path", "")}
+        products[pname]["orders"].append(o)
 
-    for pname, porders in products.items():
+    for pdata in products.values():
+        porders = pdata["orders"]
+        pname = porders[0].get("product_name", "未知") if porders else "未知"
+        pprice = pdata.get("price", 0)
+        pimage = pdata.get("image_path", "")
+        pqty = sum(o.get("quantity", 0) for o in porders)
+
+        # 产品卡片: 图片 + 信息
+        if pimage and os.path.exists(pimage):
+            try:
+                p = doc.add_paragraph()
+                run = p.add_run()
+                run.add_picture(pimage, width=Cm(4))
+                # 图片放在产品名前面
+            except Exception:
+                pass
+
+        # 产品名 + 价格 + 总数量
         p = doc.add_paragraph()
         run = p.add_run(f"产品: {pname}")
-        run.font.size = Pt(13)
+        run.font.size = Pt(14)
         run.font.bold = True
         run.font.color.rgb = RGBColor(0x1E, 0x40, 0xAF)
 
+        p = doc.add_paragraph()
+        run = p.add_run(f"  单价: ¥{pprice:,.0f}    预售数量: {pqty} 件    订单数: {len(porders)} 笔")
+        run.font.size = Pt(11)
+        run.font.color.rgb = RGBColor(0x47, 0x55, 0x69)
+
+        doc.add_paragraph()
+
+        # 订单明细表
         headers = ["订单号", "客户", "数量", "状态", "备注", "日期"]
         table = doc.add_table(rows=1 + len(porders), cols=len(headers))
         table.alignment = WD_TABLE_ALIGNMENT.CENTER

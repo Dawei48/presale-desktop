@@ -1,9 +1,15 @@
 """
 产品管理 - 属于某个品牌
+支持产品图片上传
 """
+import os
+import shutil
+import uuid
 import customtkinter as ctk
+from tkinter import filedialog
 from ui.styles import Colors, Fonts, Spacing, Radius
 from ui.components import Dialog, ConfirmDialog, Toast, EmptyState
+from config import IMAGES_DIR
 
 
 class ProductDialog(Dialog):
@@ -12,20 +18,76 @@ class ProductDialog(Dialog):
         self.brand_id = brand_id
         self.product = product
         self.on_save = on_save
-        super().__init__(parent, "编辑产品" if product else "新增产品", width=400, height=280)
+        self.image_path = product.get("image_path", "") if product else ""
+        super().__init__(parent, "编辑产品" if product else "新增产品", width=420, height=380)
 
         form = ctk.CTkFrame(self, fg_color="transparent")
         form.pack(fill="both", expand=True, padx=Spacing.XL, pady=Spacing.XL)
         form.columnconfigure(1, weight=1)
-        self.entry_name = self._make_field(form, "产品名称 *", 0)
-        self.entry_price = self._make_field(form, "价格 (元)", 1)
-        self.entry_notes = self._make_field(form, "备注", 2)
-        self._make_buttons(form, 3)
+
+        # 图片区域
+        img_row = ctk.CTkFrame(form, fg_color="transparent")
+        img_row.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, Spacing.MD))
+        self.img_label = ctk.CTkLabel(img_row, text="📷 点击选择产品图片",
+                                      font=Fonts.SMALL, text_color=Colors.TEXT_MUTED,
+                                      width=120, height=120,
+                                      fg_color=Colors.BG_INPUT, corner_radius=Radius.SM)
+        self.img_label.pack(side="left")
+        self.img_label.bind("<Button-1>", lambda e: self._pick_image())
+
+        btn_col = ctk.CTkFrame(img_row, fg_color="transparent")
+        btn_col.pack(side="left", padx=(Spacing.MD, 0))
+        ctk.CTkButton(btn_col, text="选择图片", font=Fonts.SMALL, height=30,
+                      fg_color=Colors.PRIMARY_LIGHT, hover_color=Colors.PRIMARY_DIM,
+                      text_color=Colors.PRIMARY, corner_radius=Radius.SM,
+                      command=self._pick_image).pack(anchor="w")
+        if self.image_path:
+            ctk.CTkButton(btn_col, text="移除图片", font=Fonts.SMALL, height=30,
+                          fg_color="transparent", hover_color=Colors.DANGER_LIGHT,
+                          text_color=Colors.DANGER, corner_radius=Radius.SM,
+                          command=self._remove_image).pack(anchor="w", pady=(4, 0))
+
+        self._refresh_preview()
+
+        self.entry_name = self._make_field(form, "产品名称 *", 1)
+        self.entry_price = self._make_field(form, "价格 (元)", 2)
+        self.entry_notes = self._make_field(form, "备注", 3)
+        self._make_buttons(form, 4)
 
         if product:
             self.entry_name.insert(0, product["name"])
             self.entry_price.insert(0, str(product.get("price", 0)))
             self.entry_notes.insert(0, product.get("notes", ""))
+
+    def _pick_image(self):
+        filetypes = [("图片", "*.png *.jpg *.jpeg *.gif *.webp"), ("所有文件", "*.*")]
+        path = filedialog.askopenfilename(filetypes=filetypes)
+        if path:
+            ext = os.path.splitext(path)[1].lower()
+            filename = f"{uuid.uuid4().hex[:12]}{ext}"
+            dest = os.path.join(IMAGES_DIR, filename)
+            shutil.copy2(path, dest)
+            self.image_path = dest
+            self._refresh_preview()
+
+    def _remove_image(self):
+        self.image_path = ""
+        self._refresh_preview()
+
+    def _refresh_preview(self):
+        if self.image_path and os.path.exists(self.image_path):
+            try:
+                from PIL import Image, ImageTk
+                img = Image.open(self.image_path)
+                img.thumbnail((120, 120))
+                from customtkinter import CTkImage
+                ctk_img = CTkImage(light_mode=img, dark_mode=img, size=(120, 120))
+                self.img_label.configure(image=ctk_img, text="")
+                self.img_label._img = ctk_img
+            except Exception:
+                self.img_label.configure(text="📷 无法预览", image="")
+        else:
+            self.img_label.configure(text="📷 点击选择产品图片", image="")
 
     def _on_ok(self):
         name = self.entry_name.get().strip()
@@ -42,6 +104,7 @@ class ProductDialog(Dialog):
             "name": name,
             "price": price,
             "notes": self.entry_notes.get().strip(),
+            "image_path": self.image_path,
         }
         if self.on_save:
             self.on_save(self.result)
@@ -59,7 +122,6 @@ class ProductsTab(ctk.CTkFrame):
         self._load()
 
     def _build(self):
-        # 标题行 + 返回按钮
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", padx=Spacing.XL, pady=(Spacing.XL, Spacing.LG))
 
@@ -104,13 +166,28 @@ class ProductsTab(ctk.CTkFrame):
             card.pack(fill="x", pady=(0, Spacing.SM))
             inner = ctk.CTkFrame(card, fg_color="transparent")
             inner.pack(fill="x", padx=Spacing.LG, pady=Spacing.LG)
+
+            # 缩略图
+            img_path = p.get("image_path", "")
+            if img_path and os.path.exists(img_path):
+                try:
+                    from PIL import Image as PILImage
+                    from customtkinter import CTkImage
+                    img = PILImage.open(img_path)
+                    img.thumbnail((60, 60))
+                    ctk_img = CTkImage(light_mode=img, dark_mode=img, size=(60, 60))
+                    lbl = ctk.CTkLabel(inner, image=ctk_img, text="", width=60, height=60)
+                    lbl._img = ctk_img
+                    lbl.pack(side="left", padx=(0, Spacing.MD))
+                except Exception:
+                    pass
+
             left = ctk.CTkFrame(inner, fg_color="transparent")
             left.pack(side="left", fill="x", expand=True)
             ctk.CTkLabel(left, text=p["name"], font=Fonts.H2,
                          text_color=Colors.TEXT_PRIMARY).pack(side="left")
             ctk.CTkLabel(left, text=f"  ¥{p['price']:,.0f}", font=Fonts.H2,
                          text_color=Colors.PRIMARY).pack(side="left", padx=(Spacing.MD, 0))
-            # 查看订单数
             order_count = len(self.db.get_orders(product_id=p["id"]))
             ctk.CTkLabel(left, text=f"  {order_count} 笔订单",
                          font=Fonts.SMALL, text_color=Colors.TEXT_MUTED).pack(
@@ -152,7 +229,8 @@ class ProductsTab(ctk.CTkFrame):
 
     def _edit(self, product):
         def on_save(data):
-            self.db.update_product(product["id"], name=data["name"], price=data["price"], notes=data["notes"])
+            self.db.update_product(product["id"], name=data["name"], price=data["price"],
+                                   notes=data["notes"], image_path=data["image_path"])
             self.db.log("编辑产品", f"产品: {data['name']}", self.current_user["id"], self.current_user["username"])
             Toast(self, "✅ 产品已更新")
             self._load()
