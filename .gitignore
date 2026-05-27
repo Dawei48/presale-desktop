@@ -22,3 +22,6 @@ build/
 *.png
 *.jpg
 test_gui.py
+error.log
+build/
+*.spec
