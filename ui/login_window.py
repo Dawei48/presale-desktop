@@ -105,15 +105,20 @@ class SetupWindow(ctk.CTkFrame):
             self.lbl_error.configure(text="密码至少4位")
             return
 
-        db = self._db
-        if db.user_exists(username):
-            self.lbl_error.configure(text="用户名已存在")
-            return
-
-        db.add_user(username, password, display_name, "admin")
-        db.log("系统初始化", f"创建管理员: {username}")
-        user = db.login(username, password)
-        self.on_done(user)
+        try:
+            db = self._db
+            if not db:
+                self.lbl_error.configure(text="数据库未连接")
+                return
+            if db.user_exists(username):
+                self.lbl_error.configure(text="用户名已存在")
+                return
+            db.add_user(username, password, display_name, "admin")
+            db.log("系统初始化", f"创建管理员: {username}")
+            user = db.login(username, password)
+            self.on_done(user)
+        except Exception as e:
+            self.lbl_error.configure(text=f"创建失败: {e}")
 
 
 class LoginWindow(ctk.CTkFrame):
@@ -178,12 +183,19 @@ class LoginWindow(ctk.CTkFrame):
         SetupWindow(self.master, on_done=self.on_success, db=self._db).pack(fill="both", expand=True)
 
     def _do_login(self):
-        db = self._db
-        user = db.login(self.entry_user.get().strip(), self.entry_pass.get().strip())
-        if user:
-            db.log("登录系统", f"用户 {user['username']} 登录", user["id"], user["username"])
-            self.on_success(user)
-        else:
-            self.lbl_error.configure(text="用户名或密码错误")
+        try:
+            db = self._db
+            if not db:
+                self.lbl_error.configure(text="数据库未连接")
+                return
+            user = db.login(self.entry_user.get().strip(), self.entry_pass.get().strip())
+            if user:
+                db.log("登录系统", f"用户 {user['username']} 登录", user["id"], user["username"])
+                self.on_success(user)
+            else:
+                self.lbl_error.configure(text="用户名或密码错误")
+                self.entry_pass.delete(0, "end")
+                self.entry_pass.focus()
+        except Exception as e:
+            self.lbl_error.configure(text=f"连接失败: {e}")
             self.entry_pass.delete(0, "end")
-            self.entry_pass.focus()
