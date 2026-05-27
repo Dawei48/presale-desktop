@@ -13,14 +13,23 @@ from config import IMAGES_DIR
 
 
 def load_ctk_image(path, size=(64, 64), add_border=False):
-    """安全加载图片，返回 (CTkImage, PIL原图) 或 (None, None)"""
-    if not path or not os.path.exists(path):
+    """安全加载图片（支持本地路径和URL），返回 (CTkImage, PIL原图) 或 (None, None)"""
+    if not path:
         return None, None
     try:
         from PIL import Image as PILImage
         from customtkinter import CTkImage
         from utils.image_utils import add_seal_border
-        pil_img = PILImage.open(path).convert("RGB")
+
+        if path.startswith("http"):
+            import urllib.request
+            with urllib.request.urlopen(path, timeout=10) as resp:
+                pil_img = PILImage.open(resp).convert("RGB")
+        elif os.path.exists(path):
+            pil_img = PILImage.open(path).convert("RGB")
+        else:
+            return None, None
+
         pil_img.thumbnail(size)
         if add_border:
             pil_img = add_seal_border(pil_img, border_width=2)
@@ -78,15 +87,29 @@ class ProductDialog(Dialog):
             self.entry_price.insert(0, str(product.get("price", 0)))
 
     def _pick_image(self):
+        from config import USE_CLOUD
         filetypes = [("图片", "*.png *.jpg *.jpeg *.gif *.webp"), ("所有文件", "*.*")]
         path = filedialog.askopenfilename(filetypes=filetypes)
         if path:
-            ext = os.path.splitext(path)[1].lower()
-            filename = f"{uuid.uuid4().hex[:12]}{ext}"
-            dest = os.path.join(IMAGES_DIR, filename)
-            shutil.copy2(path, dest)
-            self.image_path = dest
-            self._refresh_preview()
+            if USE_CLOUD:
+                # 云端：上传到Supabase Storage
+                try:
+                    from database_cloud import Database
+                    db = Database()
+                    Toast(self, "⬆️ 正在上传图片...", "info")
+                    url = db.upload_image(path)
+                    self.image_path = url
+                    self._refresh_preview()
+                except Exception as e:
+                    Toast(self, f"上传失败: {e}", "error")
+            else:
+                # 本地：复制到images目录
+                ext = os.path.splitext(path)[1].lower()
+                filename = f"{uuid.uuid4().hex[:12]}{ext}"
+                dest = os.path.join(IMAGES_DIR, filename)
+                shutil.copy2(path, dest)
+                self.image_path = dest
+                self._refresh_preview()
 
     def _remove_image(self):
         self.image_path = ""
@@ -94,10 +117,10 @@ class ProductDialog(Dialog):
         self._refresh_preview()
 
     def _refresh_preview(self):
-        if self.image_path and os.path.exists(self.image_path):
+        if self.image_path:
             ctk_img, pil_img = load_ctk_image(self.image_path, (100, 100))
             if ctk_img:
-                self._pil_ref = pil_img  # 保持引用
+                self._pil_ref = pil_img
                 self.img_label.configure(image=ctk_img, text="", width=100, height=100)
                 self.img_label._img = ctk_img
             else:
@@ -220,14 +243,15 @@ class ProductsTab(ctk.CTkFrame):
             img_frame.pack(side="left", padx=Spacing.SM)
             img_frame.pack_propagate(False)
             img_path = p.get("image_path", "")
-            if img_path and os.path.exists(img_path):
+            has_img = img_path and (img_path.startswith("http") or os.path.exists(img_path))
+            if has_img:
                 ctk_img, pil_img = load_ctk_image(img_path, (52, 52), add_border=True)
                 if ctk_img:
                     self._pil_refs.append(pil_img)
                     lbl = ctk.CTkLabel(img_frame, image=ctk_img, text="", width=56, height=56)
                     lbl._img = ctk_img
                     lbl.pack(anchor="w", pady=6)
-            if not img_path or not os.path.exists(img_path):
+            if not has_img:
                 ctk.CTkLabel(img_frame, text="📷", font=(Fonts.FAMILY, 20),
                              text_color=Colors.TEXT_MUTED, width=56, height=56,
                              fg_color=Colors.BG_INPUT, corner_radius=Radius.SM).pack(anchor="w", pady=6)

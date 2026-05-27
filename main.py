@@ -1,6 +1,6 @@
 """
-放心预 - 预售管理系统 v1.0.0
-桌面版 · 本地 SQLite · 品牌→产品→订单 · 团队协作 · Word 导出
+放心预 - 预售管理系统 v1.3.1
+桌面版 · 云端/本地 SQLite · 品牌→产品→订单 · 团队协作 · Word 导出
 """
 import sys
 import os
@@ -11,18 +11,38 @@ else:
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 
-def launch_app():
-    from database import Database
-    import customtkinter as ctk
+def get_database():
+    """根据配置返回云端或本地数据库"""
+    from config import USE_CLOUD
+    if USE_CLOUD:
+        try:
+            from database_cloud import Database
+            db = Database()
+            # 测试连接
+            db.has_users()
+            print("✅ 已连接云端数据库")
+            return db
+        except Exception as e:
+            print(f"⚠️ 云端连接失败({e})，回退到本地数据库")
+            from database import Database
+            return Database()
+    else:
+        from database import Database
+        return Database()
 
-    db = Database()
+
+def launch_app():
+    import customtkinter as ctk
+    from config import BASE_DIR
+
+    db = get_database()
     root = ctk.CTk()
     root.title("放心预")
     root.geometry("440x640")
     root.resizable(False, False)
 
     # 窗口图标
-    icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icon.ico")
+    icon_path = os.path.join(BASE_DIR, "assets", "icon.ico")
     if os.path.exists(icon_path):
         try:
             root.iconbitmap(icon_path)

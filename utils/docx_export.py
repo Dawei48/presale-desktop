@@ -16,9 +16,14 @@ from PIL import Image as PILImage
 
 
 def compress_image(img_path, max_size=(300, 300), quality=60):
-    """压缩图片并返回字节流"""
+    """压缩图片并返回字节流（支持本地路径和URL）"""
     try:
-        img = PILImage.open(img_path)
+        if img_path.startswith("http"):
+            import urllib.request
+            with urllib.request.urlopen(img_path, timeout=10) as resp:
+                img = PILImage.open(resp)
+        else:
+            img = PILImage.open(img_path)
         if img.mode in ("RGBA", "P"):
             img = img.convert("RGB")
         img.thumbnail(max_size, PILImage.LANCZOS)
@@ -126,7 +131,8 @@ def export_brand_orders_docx(brand_name, orders, filepath, title=None):
         cell_img = row.cells[0]
         cell_img.paragraphs[0].clear()
         img_path = pdata.get("image_path", "")
-        if img_path and os.path.exists(img_path):
+        has_img = img_path and (img_path.startswith("http") or os.path.exists(img_path))
+        if has_img:
             buf = compress_image(img_path, max_size=(200, 200), quality=50)
             if buf:
                 p = cell_img.paragraphs[0]

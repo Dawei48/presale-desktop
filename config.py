@@ -5,7 +5,7 @@ import os
 import sys
 
 APP_NAME = "放心预"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.3.1"
 APP_SUBTITLE = "预售管理系统"
 
 if getattr(sys, 'frozen', False):
@@ -18,6 +18,12 @@ DB_PATH = os.path.join(DATA_DIR, "presale.db")
 IMAGES_DIR = os.path.join(DATA_DIR, "images")
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(IMAGES_DIR, exist_ok=True)
+
+# ── 云端模式 ──────────────────────────────────
+USE_CLOUD = True  # True=Supabase云端, False=本地SQLite
+
+SUPABASE_URL = "https://xhcbsvfysuxqzfudkkwl.supabase.co"
+SUPABASE_KEY = "sb_publishable_CqIEa-ijlbZ3SbbEYXrTsQ_ZRR91HtB"
 
 DEFAULT_ADMIN_USER = "admin"
 DEFAULT_ADMIN_PASS = "admin123"
