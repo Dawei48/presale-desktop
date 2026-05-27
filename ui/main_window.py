@@ -14,14 +14,17 @@ from utils.docx_export import export_brand_orders_docx
 
 
 class MainWindow(ctk.CTkFrame):
-    def __init__(self, parent, user_info):
+    def __init__(self, parent, user_info, db=None):
         super().__init__(parent, fg_color=Colors.BG_MAIN)
         self.master = parent
         self.user_info = user_info
         self.is_admin = user_info.get("role") == "admin"
 
-        from database import Database
-        self.db = Database()
+        if db:
+            self.db = db
+        else:
+            from database import Database
+            self.db = Database()
 
         parent.title("放心预 - 预售管理系统")
         parent.geometry("1100x700")
@@ -214,4 +217,4 @@ class MainWindow(ctk.CTkFrame):
         self.master.geometry("1100x700")
         self.master.minsize(900, 600)
         self.master.resizable(True, True)
-        MainWindow(self.master, user_info)
+        MainWindow(self.master, user_info, db=self.db)

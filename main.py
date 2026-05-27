@@ -56,7 +56,7 @@ def launch_app():
         root.minsize(900, 600)
         root.resizable(True, True)
         from ui.main_window import MainWindow
-        MainWindow(root, user_info)
+        MainWindow(root, user_info, db=db)
 
     if db.has_users():
         from ui.login_window import LoginWindow
