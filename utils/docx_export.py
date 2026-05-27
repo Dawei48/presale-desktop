@@ -1,163 +1,170 @@
 """
-Word 导出 - 按品牌导出所有预售订单
-包含: 产品图片 + 产品名 + 价格 + 预售总数量 + 订单明细表
+Word 导出 - 仅导出未发货订单
+格式: 产品图片 | 产品名 | 价格 | 预售数量
+按产品合并，压缩图片
 """
 import os
+import io
 from datetime import datetime
 from docx import Document
-from docx.shared import Pt, Cm, RGBColor, Inches
+from docx.shared import Pt, Cm, RGBColor, Emu
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml.ns import nsdecls
 from docx.oxml import parse_xml
+from PIL import Image as PILImage
+
+
+def compress_image(img_path, max_size=(300, 300), quality=60):
+    """压缩图片并返回字节流"""
+    try:
+        img = PILImage.open(img_path)
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+        img.thumbnail(max_size, PILImage.LANCZOS)
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=quality, optimize=True)
+        buf.seek(0)
+        return buf
+    except Exception:
+        return None
 
 
 def export_brand_orders_docx(brand_name, orders, filepath, title=None):
-    """按品牌导出所有订单"""
-    if title is None:
-        title = f"{brand_name} - 预售订单汇总"
-    doc = Document()
+    """导出未发货订单 - 按产品合并"""
+    # 只取未发货订单
+    pending = [o for o in orders if o.get("status") == "pending"]
+    if not pending:
+        pending = orders  # 如果没有筛选到，就用全部（兜底）
 
+    if title is None:
+        title = f"{brand_name} - 预售订单"
+
+    doc = Document()
     section = doc.sections[0]
     section.page_width = Cm(21)
     section.page_height = Cm(29.7)
-    section.top_margin = Cm(2)
-    section.bottom_margin = Cm(2)
-    section.left_margin = Cm(2.5)
-    section.right_margin = Cm(2.5)
+    section.top_margin = Cm(1.5)
+    section.bottom_margin = Cm(1.5)
+    section.left_margin = Cm(2)
+    section.right_margin = Cm(2)
 
     # 标题
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run = p.add_run(title)
-    run.font.size = Pt(22)
+    run.font.size = Pt(18)
     run.font.bold = True
     run.font.color.rgb = RGBColor(0x0F, 0x17, 0x2A)
 
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = p.add_run(f"生成日期：{datetime.now().strftime('%Y年%m月%d日 %H:%M')}")
-    run.font.size = Pt(10)
-    run.font.color.rgb = RGBColor(0x64, 0x74, 0x8B)
+    run = p.add_run(f"生成日期：{datetime.now().strftime('%Y-%m-%d')}")
+    run.font.size = Pt(9)
+    run.font.color.rgb = RGBColor(0x94, 0xA3, 0xB8)
 
     doc.add_paragraph()
 
-    # 统计
-    total_qty = sum(o.get("quantity", 0) for o in orders)
-    status_count = {}
-    for o in orders:
-        s = o.get("status", "pending")
-        status_count[s] = status_count.get(s, 0) + 1
-
-    status_labels = {"pending": "未发货", "shipped": "已发货", "completed": "已完成", "cancelled": "已取消"}
-
-    p = doc.add_paragraph()
-    run = p.add_run("统计摘要")
-    run.font.size = Pt(14)
-    run.font.bold = True
-
-    for label, value in [("订单总数", f"{len(orders)} 笔"), ("总数量", f"{total_qty} 件")]:
-        p = doc.add_paragraph()
-        run = p.add_run(f"  {label}：")
-        run.font.size = Pt(11)
-        run.font.color.rgb = RGBColor(0x47, 0x55, 0x69)
-        run = p.add_run(value)
-        run.font.size = Pt(11)
-        run.font.bold = True
-
-    for sk, count in status_count.items():
-        p = doc.add_paragraph()
-        run = p.add_run(f"  {status_labels.get(sk, sk)}：{count} 笔")
-        run.font.size = Pt(11)
-        run.font.color.rgb = RGBColor(0x47, 0x55, 0x69)
-
-    doc.add_paragraph()
-
-    # 按产品分组
-    products = {}
-    for o in orders:
+    # 按产品合并: 同一产品多笔订单 → 一行
+    product_map = {}
+    for o in pending:
         pname = o.get("product_name", "未知")
-        if pname not in products:
-            products[pname] = {"orders": [], "price": o.get("product_price", 0),
-                               "image_path": o.get("product_image_path", "")}
-        products[pname]["orders"].append(o)
+        if pname not in product_map:
+            product_map[pname] = {
+                "price": o.get("product_price", 0),
+                "image_path": o.get("product_image_path", ""),
+                "total_qty": 0,
+                "orders": [],
+            }
+        product_map[pname]["total_qty"] += o.get("quantity", 0)
+        product_map[pname]["orders"].append(o)
 
-    for pdata in products.values():
-        porders = pdata["orders"]
-        pname = porders[0].get("product_name", "未知") if porders else "未知"
-        pprice = pdata.get("price", 0)
-        pimage = pdata.get("image_path", "")
-        pqty = sum(o.get("quantity", 0) for o in porders)
+    if not product_map:
+        doc.add_paragraph("暂无未发货订单")
+        doc.save(filepath)
+        return filepath
 
-        # 产品卡片: 图片 + 信息
-        if pimage and os.path.exists(pimage):
-            try:
-                p = doc.add_paragraph()
+    # 表格: 图片 | 产品名称 | 价格 | 预售数量
+    headers = ["产品图片", "产品名称", "价格", "预售数量"]
+    table = doc.add_table(rows=1 + len(product_map), cols=len(headers))
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    table.style = "Table Grid"
+
+    # 设置列宽
+    for row in table.rows:
+        row.cells[0].width = Cm(3)
+        row.cells[1].width = Cm(5)
+        row.cells[2].width = Cm(3)
+        row.cells[3].width = Cm(3)
+
+    # 表头
+    for i, h in enumerate(headers):
+        cell = table.rows[0].cells[i]
+        cell.text = h
+        for par in cell.paragraphs:
+            par.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            for run in par.runs:
+                run.font.size = Pt(10)
+                run.font.bold = True
+                run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+        shading = parse_xml(f'<w:shd {nsdecls("w")} w:fill="0F172A"/>')
+        cell._tc.get_or_add_tcPr().append(shading)
+
+    # 数据行
+    for ri, (pname, pdata) in enumerate(product_map.items()):
+        row = table.rows[ri + 1]
+        row.height = Cm(2.5)
+
+        # 图片列
+        cell_img = row.cells[0]
+        cell_img.paragraphs[0].clear()
+        img_path = pdata.get("image_path", "")
+        if img_path and os.path.exists(img_path):
+            buf = compress_image(img_path, max_size=(200, 200), quality=50)
+            if buf:
+                p = cell_img.paragraphs[0]
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 run = p.add_run()
-                run.add_picture(pimage, width=Cm(4))
-                # 图片放在产品名前面
-            except Exception:
-                pass
+                run.add_picture(buf, width=Cm(2.2))
 
-        # 产品名 + 价格 + 总数量
-        p = doc.add_paragraph()
-        run = p.add_run(f"产品: {pname}")
-        run.font.size = Pt(14)
-        run.font.bold = True
-        run.font.color.rgb = RGBColor(0x1E, 0x40, 0xAF)
+        # 产品名
+        cell_name = row.cells[1]
+        cell_name.text = pname
+        for par in cell_name.paragraphs:
+            par.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            for run in par.runs:
+                run.font.size = Pt(11)
+                run.font.bold = True
 
-        p = doc.add_paragraph()
-        run = p.add_run(f"  单价: ¥{pprice:,.0f}    预售数量: {pqty} 件    订单数: {len(porders)} 笔")
-        run.font.size = Pt(11)
-        run.font.color.rgb = RGBColor(0x47, 0x55, 0x69)
+        # 价格
+        cell_price = row.cells[2]
+        cell_price.text = f"¥{pdata['price']:,.0f}"
+        for par in cell_price.paragraphs:
+            par.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            for run in par.runs:
+                run.font.size = Pt(11)
 
-        doc.add_paragraph()
+        # 预售数量
+        cell_qty = row.cells[3]
+        cell_qty.text = str(pdata["total_qty"])
+        for par in cell_qty.paragraphs:
+            par.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            for run in par.runs:
+                run.font.size = Pt(11)
+                run.font.bold = True
 
-        # 订单明细表
-        headers = ["订单号", "客户", "数量", "状态", "备注", "日期"]
-        table = doc.add_table(rows=1 + len(porders), cols=len(headers))
-        table.alignment = WD_TABLE_ALIGNMENT.CENTER
-        table.style = "Table Grid"
-
-        for i, h in enumerate(headers):
-            cell = table.rows[0].cells[i]
-            cell.text = h
-            for par in cell.paragraphs:
-                par.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                for run in par.runs:
-                    run.font.size = Pt(10)
-                    run.font.bold = True
-                    run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
-            shading = parse_xml(f'<w:shd {nsdecls("w")} w:fill="0F172A"/>')
-            cell._tc.get_or_add_tcPr().append(shading)
-
-        for ri, o in enumerate(porders):
-            vals = [
-                o.get("order_no", ""),
-                o.get("customer", ""),
-                str(o.get("quantity", 0)),
-                status_labels.get(o.get("status", ""), o.get("status", "")),
-                o.get("notes", ""),
-                o.get("created_at", "")[:10],
-            ]
-            for ci, v in enumerate(vals):
-                cell = table.rows[ri + 1].cells[ci]
-                cell.text = v
-                for par in cell.paragraphs:
-                    for run in par.runs:
-                        run.font.size = Pt(9)
-            if ri % 2 == 0:
-                for ci in range(len(headers)):
-                    shading = parse_xml(f'<w:shd {nsdecls("w")} w:fill="F1F5F9"/>')
-                    table.rows[ri + 1].cells[ci]._tc.get_or_add_tcPr().append(shading)
-
-        doc.add_paragraph()
+        # 斑马纹
+        if ri % 2 == 0:
+            for ci in range(len(headers)):
+                shading = parse_xml(f'<w:shd {nsdecls("w")} w:fill="F8FAFC"/>')
+                row.cells[ci]._tc.get_or_add_tcPr().append(shading)
 
     # 页脚
+    doc.add_paragraph()
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = p.add_run("— 放心预 · 预售管理系统 —")
-    run.font.size = Pt(9)
+    run = p.add_run("— 放心预 —")
+    run.font.size = Pt(8)
     run.font.color.rgb = RGBColor(0x94, 0xA3, 0xB8)
 
     os.makedirs(os.path.dirname(filepath) or ".", exist_ok=True)

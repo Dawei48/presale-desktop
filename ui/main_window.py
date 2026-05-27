@@ -165,9 +165,9 @@ class MainWindow(ctk.CTkFrame):
             b = brand_map.get(name)
             if not b:
                 return
-            orders = self.db.get_orders(brand_id=b["id"])
+            orders = self.db.get_orders(brand_id=b["id"], status="pending")
             if not orders:
-                messagebox.showinfo("提示", f"品牌「{name}」暂无订单", parent=dialog)
+                messagebox.showinfo("提示", f"品牌「{name}」暂无未发货订单", parent=dialog)
                 return
             filepath = filedialog.asksaveasfilename(
                 parent=dialog, defaultextension=".docx",
@@ -176,7 +176,10 @@ class MainWindow(ctk.CTkFrame):
             if filepath:
                 export_brand_orders_docx(name, orders, filepath)
                 dialog.destroy()
-                if messagebox.askyesno("导出成功", f"已导出 {len(orders)} 笔订单到:\n{filepath}\n\n是否打开？"):
+                # 统计产品数
+                from collections import Counter
+                product_count = len(set(o.get("product_name", "") for o in orders))
+                if messagebox.askyesno("导出成功", f"已导出 {product_count} 个产品（未发货）到:\n{filepath}\n\n是否打开？"):
                     import os
                     os.startfile(filepath)
 
