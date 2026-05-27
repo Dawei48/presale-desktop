@@ -129,6 +129,7 @@ class LoginWindow(ctk.CTkFrame):
         super().__init__(parent, fg_color=Colors.BG_MAIN)
         self.on_success = on_success
         self._db = db
+        self._mode_label = mode_label
 
         card = ctk.CTkFrame(self, fg_color=Colors.BG_CARD, corner_radius=Radius.XL,
                             border_width=1, border_color=Colors.BORDER,
