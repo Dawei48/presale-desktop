@@ -49,7 +49,8 @@ def launch_app():
     root.resizable(False, False)
 
     # 窗口图标
-    icon_path = os.path.join(BASE_DIR, "assets", "icon.ico")
+    from config import _find_resource
+    icon_path = _find_resource("assets/icon.ico")
     if os.path.exists(icon_path):
         try:
             root.iconbitmap(icon_path)

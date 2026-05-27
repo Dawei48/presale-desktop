@@ -9,9 +9,22 @@ APP_VERSION = "1.3.1"
 APP_SUBTITLE = "预售管理系统"
 
 if getattr(sys, 'frozen', False):
-    BASE_DIR = os.path.dirname(sys.executable)
+    BUNDLE_DIR = sys._MEIPASS  # PyInstaller解压目录
+    BASE_DIR = os.path.dirname(sys.executable)  # exe所在目录
 else:
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    BUNDLE_DIR = os.path.dirname(os.path.abspath(__file__))
+    BASE_DIR = BUNDLE_DIR
+
+# 资源文件优先从打包目录找，找不到从exe目录找
+def _find_resource(relative_path):
+    """在打包目录和exe目录中查找资源"""
+    p1 = os.path.join(BUNDLE_DIR, relative_path)
+    if os.path.exists(p1):
+        return p1
+    p2 = os.path.join(BASE_DIR, relative_path)
+    if os.path.exists(p2):
+        return p2
+    return p1  # 返回默认路径（即使不存在）
 
 DATA_DIR = os.path.join(BASE_DIR, "data")
 DB_PATH = os.path.join(DATA_DIR, "presale.db")

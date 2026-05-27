@@ -162,7 +162,8 @@ class ProductsTab(ctk.CTkFrame):
     def _load_logo(self):
         import os
         from config import BASE_DIR
-        logo_path = os.path.join(BASE_DIR, "assets", "logo.png")
+        from config import _find_resource
+        logo_path = _find_resource("assets/logo.png")
         if not os.path.exists(logo_path):
             return None
         try:

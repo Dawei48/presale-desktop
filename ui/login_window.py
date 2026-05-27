@@ -6,7 +6,8 @@ import customtkinter as ctk
 from ui.styles import Colors, Fonts, Spacing, Radius
 from config import BASE_DIR
 
-LOGO_PATH = os.path.join(BASE_DIR, "assets", "logo.png")
+from config import _find_resource
+LOGO_PATH = _find_resource("assets/logo.png")
 
 
 def _load_logo():

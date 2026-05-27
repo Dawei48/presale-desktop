@@ -58,7 +58,8 @@ def export_brand_orders_docx(brand_name, orders, filepath, title=None):
 
     # Logo + 标题
     from config import BASE_DIR
-    logo_path = os.path.join(BASE_DIR, "assets", "logo.png")
+    from config import _find_resource
+    logo_path = _find_resource("assets/logo.png")
     if os.path.exists(logo_path):
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -90,27 +91,32 @@ def export_brand_orders_docx(brand_name, orders, filepath, title=None):
                 "image_path": o.get("product_image_path", ""),
                 "total_qty": 0,
                 "orders": [],
+                "dates": [],
             }
         product_map[pname]["total_qty"] += o.get("quantity", 0)
         product_map[pname]["orders"].append(o)
+        date_str = o.get("created_at", "")[:10]
+        if date_str and date_str not in product_map[pname]["dates"]:
+            product_map[pname]["dates"].append(date_str)
 
     if not product_map:
         doc.add_paragraph("暂无未发货订单")
         doc.save(filepath)
         return filepath
 
-    # 表格: 图片 | 产品名称 | 价格 | 预售数量
-    headers = ["产品图片", "产品名称", "价格", "预售数量"]
+    # 表格: 图片 | 产品名称 | 价格 | 预售数量 | 预售日期
+    headers = ["产品图片", "产品名称", "价格", "预售数量", "预售日期"]
     table = doc.add_table(rows=1 + len(product_map), cols=len(headers))
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     table.style = "Table Grid"
 
     # 设置列宽
     for row in table.rows:
-        row.cells[0].width = Cm(3)
-        row.cells[1].width = Cm(5)
-        row.cells[2].width = Cm(3)
-        row.cells[3].width = Cm(3)
+        row.cells[0].width = Cm(2.5)
+        row.cells[1].width = Cm(4)
+        row.cells[2].width = Cm(2)
+        row.cells[3].width = Cm(2)
+        row.cells[4].width = Cm(5)
 
     # 表头
     for i, h in enumerate(headers):
@@ -168,6 +174,15 @@ def export_brand_orders_docx(brand_name, orders, filepath, title=None):
             for run in par.runs:
                 run.font.size = Pt(11)
                 run.font.bold = True
+
+        # 预售日期（所有订单日期，逗号分隔）
+        cell_dates = row.cells[4]
+        dates = pdata.get("dates", [])
+        cell_dates.text = "、".join(dates) if dates else "-"
+        for par in cell_dates.paragraphs:
+            par.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            for run in par.runs:
+                run.font.size = Pt(9)
 
         # 斑马纹
         if ri % 2 == 0:

@@ -1,6 +1,7 @@
 """
-预售管理系统 - Supabase REST API 直连版
+预售管理系统 - Supabase REST API 直连版 (Optimized)
 不依赖 supabase-py 库，纯 HTTP 请求，PyInstaller 打包零问题
+性能优化：消除 N+1 查询，批量获取关联数据后在 Python 中 join
 """
 import hashlib
 import os
@@ -16,7 +17,7 @@ REST_URL = f"{SUPABASE_URL}/rest/v1"
 STORAGE_URL = f"{SUPABASE_URL}/storage/v1"
 
 
-def _api(table, method="GET", data=None, filters=None, count=False):
+def _api(table, method="GET", data=None, filters=None, count=False, order=None, limit=None):
     """直接调 Supabase PostgREST API"""
     url = f"{REST_URL}/{table}"
     headers = {
@@ -32,33 +33,78 @@ def _api(table, method="GET", data=None, filters=None, count=False):
     if filters:
         for k, v in filters.items():
             if isinstance(v, dict):
-                # 特殊操作: ilike, in_, eq 等
                 for op, val in v.items():
                     if op == "ilike":
-                        query.append(f"{k}=ilike.%{val}%")
+                        query.append(f"{k}=ilike.{urllib.parse.quote(f'%{val}%')}")
                     elif op == "eq":
                         query.append(f"{k}=eq.{val}")
                     elif op == "in":
-                        query.append(f"{k}=in.({','.join(val)})")
+                        query.append(f"{k}=in.({','.join(str(x) for x in val)})")
+                    elif op == "neq":
+                        query.append(f"{k}=neq.{val}")
+                    elif op == "not.is":
+                        query.append(f"{k}=not.is.{val}")
             else:
                 query.append(f"{k}=eq.{v}")
+    if order:
+        # order="created_at.desc" or "name.asc"
+        query.append(f"order={order}")
+    if limit:
+        query.append(f"limit={limit}")
+
     if query:
         url += "?" + "&".join(query)
 
     body = json.dumps(data).encode() if data else None
     req = urllib.request.Request(url, data=body, headers=headers, method=method)
 
-    with urllib.request.urlopen(req, timeout=15) as resp:
+    with urllib.request.urlopen(req, timeout=30) as resp:
         result = resp.read().decode()
         result = json.loads(result) if result else []
         if count:
             total = resp.headers.get("content-range", "")
-            # format: 0-9/15
             if "/" in total:
                 result = {"data": result, "count": int(total.split("/")[1])}
             else:
                 result = {"data": result, "count": 0}
         return result
+
+
+def _batch_products_for_brands(brand_ids):
+    """Fetch all products matching the given brand_ids in one call. Returns dict: brand_id -> count"""
+    if not brand_ids:
+        return {}
+    brand_ids = list(set(brand_ids))
+    # PostgREST 'in' filter
+    rows = _api("products", filters={"brand_id": {"in": [str(b) for b in brand_ids]}})
+    counts = {}
+    for p in rows:
+        bid = p.get("brand_id")
+        if bid:
+            counts[bid] = counts.get(bid, 0) + 1
+    return counts
+
+
+def _batch_products_by_ids(product_ids):
+    """Fetch all products with matching ids in one call. Returns dict: product_id -> product"""
+    if not product_ids:
+        return {}
+    product_ids = list(set(str(pid) for pid in product_ids if pid))
+    if not product_ids:
+        return {}
+    rows = _api("products", filters={"id": {"in": product_ids}})
+    return {str(p["id"]): p for p in rows}
+
+
+def _batch_brands_by_ids(brand_ids):
+    """Fetch all brands with matching ids in one call. Returns dict: brand_id -> brand"""
+    if not brand_ids:
+        return {}
+    brand_ids = list(set(str(bid) for bid in brand_ids if bid))
+    if not brand_ids:
+        return {}
+    rows = _api("brands", filters={"id": {"in": brand_ids}})
+    return {str(b["id"]): b for b in rows}
 
 
 class Database:
@@ -128,12 +174,14 @@ class Database:
     # ════════════════════════════════════════════
     def get_brands(self):
         rows = _api("brands")
-        result = []
+        if not rows:
+            return []
+        brand_ids = [b["id"] for b in rows]
+        # ONE call to get all products for these brands
+        product_counts = _batch_products_for_brands(brand_ids)
         for b in rows:
-            pc = _api("products", filters={"brand_id": b["id"]}, count=True)
-            b["product_count"] = pc["count"]
-            result.append(b)
-        return result
+            b["product_count"] = product_counts.get(b["id"], 0)
+        return rows
 
     def get_brand(self, brand_id):
         rows = _api("brands", filters={"id": brand_id})
@@ -157,32 +205,52 @@ class Database:
         if brand_id:
             filters["brand_id"] = brand_id
         rows = _api("products", filters=filters)
-        # 补 brand_name
+        # Batch-fetch all brands needed
+        brand_ids = list(set(p.get("brand_id") for p in rows if p.get("brand_id")))
+        brands_map = _batch_brands_by_ids(brand_ids)
         for p in rows:
-            if p.get("brand_id"):
-                b = self.get_brand(p["brand_id"])
+            bid = p.get("brand_id")
+            if bid:
+                b = brands_map.get(str(bid))
                 p["brand_name"] = b["name"] if b else ""
             else:
                 p["brand_name"] = ""
         return rows
 
     def search_products(self, keyword):
-        rows = _api("products")
-        results = []
-        kw = keyword.lower()
-        for p in rows:
-            if kw in (p.get("name", "") + p.get("notes", "")).lower():
-                b = self.get_brand(p["brand_id"]) if p.get("brand_id") else None
+        # Use PostgREST ilike filter on server side for name and notes
+        rows = _api("products", filters={"name": {"ilike": keyword}})
+        # Also search in notes
+        rows2 = _api("products", filters={"notes": {"ilike": keyword}})
+        # Merge by id, dedup
+        seen = set()
+        merged = []
+        for p in rows + rows2:
+            pid = p.get("id")
+            if pid and pid not in seen:
+                seen.add(pid)
+                merged.append(p)
+        # Batch-fetch brands
+        brand_ids = list(set(p.get("brand_id") for p in merged if p.get("brand_id")))
+        brands_map = _batch_brands_by_ids(brand_ids)
+        for p in merged:
+            bid = p.get("brand_id")
+            if bid:
+                b = brands_map.get(str(bid))
                 p["brand_name"] = b["name"] if b else ""
-                results.append(p)
-        return results
+            else:
+                p["brand_name"] = ""
+        return merged
 
     def get_product(self, product_id):
         rows = _api("products", filters={"id": product_id})
         if rows:
             p = rows[0]
-            b = self.get_brand(p["brand_id"]) if p.get("brand_id") else None
-            p["brand_name"] = b["name"] if b else ""
+            if p.get("brand_id"):
+                b = _batch_brands_by_ids([p["brand_id"]]).get(str(p["brand_id"]))
+                p["brand_name"] = b["name"] if b else ""
+            else:
+                p["brand_name"] = ""
             return p
         return None
 
@@ -216,25 +284,44 @@ class Database:
             filters["product_id"] = product_id
         if status:
             filters["status"] = status
-        rows = _api("orders", filters=filters)
 
-        # 补关联数据
+        # Fetch filtered orders in ONE call (or all if no filters)
+        if filters or keyword:
+            rows = _api("orders", filters=filters)
+        else:
+            rows = _api("orders")
+
+        if not rows:
+            return []
+
+        # Batch-fetch all products for these orders in ONE call
+        product_ids = list(set(o.get("product_id") for o in rows if o.get("product_id")))
+        products_map = _batch_products_by_ids(product_ids)
+
+        # Batch-fetch all brands needed for those products
+        brand_ids = list(set(p.get("brand_id") for p in products_map.values() if p.get("brand_id")))
+        brands_map = _batch_brands_by_ids(brand_ids)
+
+        # Join in Python
         results = []
         for o in rows:
-            prod = self.get_product(o["product_id"]) if o.get("product_id") else {}
-            o["product_name"] = prod.get("name", "") if prod else ""
-            o["product_price"] = prod.get("price", 0) if prod else 0
-            o["product_image_path"] = prod.get("image_path", "") if prod else ""
-            o["brand_name"] = prod.get("brand_name", "") if prod else ""
+            pid = str(o.get("product_id", ""))
+            prod = products_map.get(pid, {})
+            o["product_name"] = prod.get("name", "")
+            o["product_price"] = prod.get("price", 0)
+            o["product_image_path"] = prod.get("image_path", "")
+            bid = str(prod.get("brand_id", ""))
+            brand = brands_map.get(bid, {})
+            o["brand_name"] = brand.get("name", "")
             results.append(o)
 
-        # 品牌筛选
+        # Brand filter (server-side would require joins, do in Python after batch fetch)
         if brand_id:
-            results = [o for o in results if o.get("brand_name") and self.get_brand(
-                self.get_product(o["product_id"])["brand_id"]
-            ) and self.get_product(o["product_id"])["brand_id"] == brand_id]
+            results = [o for o in results if str(
+                products_map.get(str(o.get("product_id", "")), {}).get("brand_id", "")
+            ) == str(brand_id)]
 
-        # 关键词筛选
+        # Keyword filter
         if keyword:
             kw = keyword.lower()
             results = [o for o in results if kw in (
@@ -248,10 +335,21 @@ class Database:
         rows = _api("orders", filters={"id": order_id})
         if rows:
             o = rows[0]
-            prod = self.get_product(o["product_id"]) if o.get("product_id") else {}
-            o["product_name"] = prod.get("name", "") if prod else ""
-            b = self.get_brand(prod["brand_id"]) if prod and prod.get("brand_id") else None
-            o["brand_name"] = b["name"] if b else ""
+            pid = o.get("product_id")
+            if pid:
+                products_map = _batch_products_by_ids([pid])
+                prod = products_map.get(str(pid), {})
+                o["product_name"] = prod.get("name", "")
+                bid = prod.get("brand_id")
+                if bid:
+                    brands_map = _batch_brands_by_ids([bid])
+                    brand = brands_map.get(str(bid), {})
+                    o["brand_name"] = brand.get("name", "")
+                else:
+                    o["brand_name"] = ""
+            else:
+                o["product_name"] = ""
+                o["brand_name"] = ""
             return o
         return None
 
@@ -305,7 +403,7 @@ class Database:
         })
 
     def get_logs(self, limit=50):
-        return _api("activity_log")
+        return _api("activity_log", order="created_at.desc", limit=limit)
 
     # ════════════════════════════════════════════
     #  图片上传
@@ -342,3 +440,5 @@ class Database:
             urllib.request.urlopen(req, timeout=10)
         except Exception:
             pass
+
+print('DONE')
