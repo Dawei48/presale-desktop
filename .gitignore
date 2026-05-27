@@ -25,3 +25,6 @@ test_gui.py
 error.log
 build/
 *.spec
+
+# 保留 logo
+!assets/logo.png

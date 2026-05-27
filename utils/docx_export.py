@@ -49,7 +49,14 @@ def export_brand_orders_docx(brand_name, orders, filepath, title=None):
     section.left_margin = Cm(2)
     section.right_margin = Cm(2)
 
-    # 标题
+    # Logo + 标题
+    logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "logo.png")
+    if os.path.exists(logo_path):
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = p.add_run()
+        run.add_picture(logo_path, width=Cm(2.5))
+
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run = p.add_run(title)

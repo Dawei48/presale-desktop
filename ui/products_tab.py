@@ -12,15 +12,18 @@ from ui.components import Dialog, ConfirmDialog, Toast, EmptyState
 from config import IMAGES_DIR
 
 
-def load_ctk_image(path, size=(64, 64)):
+def load_ctk_image(path, size=(64, 64), add_border=False):
     """安全加载图片，返回 (CTkImage, PIL原图) 或 (None, None)"""
     if not path or not os.path.exists(path):
         return None, None
     try:
         from PIL import Image as PILImage
         from customtkinter import CTkImage
-        pil_img = PILImage.open(path)
+        from utils.image_utils import add_seal_border
+        pil_img = PILImage.open(path).convert("RGB")
         pil_img.thumbnail(size)
+        if add_border:
+            pil_img = add_seal_border(pil_img, border_width=2)
         ctk_img = CTkImage(light_image=pil_img, dark_image=pil_img, size=pil_img.size)
         return ctk_img, pil_img
     except Exception:
@@ -132,23 +135,42 @@ class ProductsTab(ctk.CTkFrame):
         self.brand = brand
         self.on_back = on_back
         self._pil_refs = []  # 保持所有缩略图引用
+        self._logo = self._load_logo()
         self._build()
         self._load()
+
+    def _load_logo(self):
+        import os
+        from config import BASE_DIR
+        logo_path = os.path.join(BASE_DIR, "assets", "logo.png")
+        if not os.path.exists(logo_path):
+            return None
+        try:
+            from PIL import Image
+            from customtkinter import CTkImage
+            img = Image.open(logo_path)
+            img.thumbnail((32, 32))
+            return CTkImage(light_image=img, dark_image=img, size=img.size)
+        except Exception:
+            return None
 
     def _build(self):
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", padx=Spacing.XL, pady=(Spacing.XL, Spacing.LG))
 
+        if self._logo:
+            ctk.CTkLabel(header, image=self._logo, text="").pack(side="left")
+
         if self.brand:
             ctk.CTkButton(header, text="← 返回品牌", font=Fonts.SMALL, height=32,
                           fg_color=Colors.PRIMARY_LIGHT, hover_color=Colors.PRIMARY_DIM,
                           text_color=Colors.PRIMARY, corner_radius=Radius.MD,
-                          command=self._go_back).pack(side="left")
+                          command=self._go_back).pack(side="left", padx=(Spacing.SM if self._logo else 0, 0))
             ctk.CTkLabel(header, text=f"  {self.brand['name']}", font=Fonts.H1,
                          text_color=Colors.TEXT_PRIMARY).pack(side="left", padx=(Spacing.SM, 0))
         else:
-            ctk.CTkLabel(header, text="产品管理", font=Fonts.H1,
-                         text_color=Colors.TEXT_PRIMARY).pack(side="left")
+            ctk.CTkLabel(header, text="  产品管理", font=Fonts.H1,
+                         text_color=Colors.TEXT_PRIMARY).pack(side="left", padx=(Spacing.SM if self._logo else 0, 0))
 
         ctk.CTkButton(header, text="＋ 新增产品", font=Fonts.BODY_B, height=38,
                       fg_color=Colors.PRIMARY, hover_color=Colors.PRIMARY_HOVER,
@@ -199,7 +221,7 @@ class ProductsTab(ctk.CTkFrame):
             img_frame.pack_propagate(False)
             img_path = p.get("image_path", "")
             if img_path and os.path.exists(img_path):
-                ctk_img, pil_img = load_ctk_image(img_path, (56, 56))
+                ctk_img, pil_img = load_ctk_image(img_path, (52, 52), add_border=True)
                 if ctk_img:
                     self._pil_refs.append(pil_img)
                     lbl = ctk.CTkLabel(img_frame, image=ctk_img, text="", width=56, height=56)

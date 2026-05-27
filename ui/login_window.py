@@ -1,8 +1,26 @@
 """
 登录窗口 - 首次打开注册管理员，之后登录
 """
+import os
 import customtkinter as ctk
 from ui.styles import Colors, Fonts, Spacing, Radius
+from config import BASE_DIR
+
+LOGO_PATH = os.path.join(BASE_DIR, "assets", "logo.png")
+
+
+def _load_logo():
+    """加载 logo 返回 CTkImage 或 None"""
+    if not os.path.exists(LOGO_PATH):
+        return None
+    try:
+        from PIL import Image
+        from customtkinter import CTkImage
+        img = Image.open(LOGO_PATH)
+        img.thumbnail((90, 90))
+        return CTkImage(light_image=img, dark_image=img, size=img.size)
+    except Exception:
+        return None
 
 
 class SetupWindow(ctk.CTkFrame):
@@ -18,7 +36,11 @@ class SetupWindow(ctk.CTkFrame):
         card.place(relx=0.5, rely=0.5, anchor="center")
         card.pack_propagate(False)
 
-        ctk.CTkLabel(card, text="📦", font=(Fonts.FAMILY, 36)).pack(pady=(24, 4))
+        logo = _load_logo()
+        if logo:
+            ctk.CTkLabel(card, image=logo, text="").pack(pady=(20, 4))
+        else:
+            ctk.CTkLabel(card, text="📦", font=(Fonts.FAMILY, 36)).pack(pady=(24, 4))
         ctk.CTkLabel(card, text="欢迎使用 放心预", font=Fonts.H1,
                      text_color=Colors.TEXT_PRIMARY).pack()
         ctk.CTkLabel(card, text="首次使用，请创建管理员账号", font=Fonts.SMALL,
@@ -108,7 +130,11 @@ class LoginWindow(ctk.CTkFrame):
         card.place(relx=0.5, rely=0.45, anchor="center")
         card.pack_propagate(False)
 
-        ctk.CTkLabel(card, text="📦", font=(Fonts.FAMILY, 36)).pack(pady=(28, 4))
+        logo = _load_logo()
+        if logo:
+            ctk.CTkLabel(card, image=logo, text="").pack(pady=(20, 4))
+        else:
+            ctk.CTkLabel(card, text="📦", font=(Fonts.FAMILY, 36)).pack(pady=(28, 4))
         ctk.CTkLabel(card, text="放心预", font=Fonts.TITLE,
                      text_color=Colors.TEXT_PRIMARY).pack()
         ctk.CTkLabel(card, text="预售管理系统", font=Fonts.SMALL,
