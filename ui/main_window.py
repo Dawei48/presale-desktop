@@ -209,6 +209,8 @@ class MainWindow(ctk.CTkFrame):
             self.master.minsize(100, 100)
             self.master.resizable(False, False)
             from ui.login_window import LoginWindow
+            from ui.login_window import clear_saved_login
+            clear_saved_login()
             LoginWindow(self.master, on_success=self._go_main, db=self.db).pack(fill="both", expand=True)
 
     def _go_main(self, user_info):

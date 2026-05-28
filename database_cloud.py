@@ -444,5 +444,20 @@ class Database:
             urllib.request.urlopen(req, timeout=10)
         except Exception:
             pass
+    def get_order_counts_batch(self, product_ids):
+        """批量获取每个产品的订单数，只用1次HTTP请求。
+        返回 dict: product_id -> count"""
+        if not product_ids:
+            return {}
+        pids = [str(pid) for pid in product_ids if pid]
+        if not pids:
+            return {}
+        rows = _api("orders", filters={"product_id": {"in": pids}}, count=True)
+        counts = {}
+        for o in rows.get("data", rows) if isinstance(rows, dict) else rows:
+            pid = str(o.get("product_id", ""))
+            counts[pid] = counts.get(pid, 0) + 1
+        return counts
+
 
 print('DONE')

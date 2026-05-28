@@ -70,8 +70,23 @@ def launch_app():
     mode_label = "🌐 云端模式" if cloud_error is None else "⚠️ 本地模式（云端连接失败）"
 
     if db.has_users():
-        from ui.login_window import LoginWindow
-        LoginWindow(root, on_success=go_main, db=db, mode_label=mode_label).pack(fill="both", expand=True)
+        # 尝试自动登录
+        auto_logged_in = False
+        try:
+            from ui.login_window import load_saved_login
+            saved = load_saved_login()
+            if saved:
+                username, password = saved
+                user = db.login(username, password)
+                if user:
+                    db.log("自动登录", f"用户 {user['username']} 自动登录", user["id"], user["username"])
+                    go_main(user)
+                    auto_logged_in = True
+        except Exception:
+            pass
+        if not auto_logged_in:
+            from ui.login_window import LoginWindow
+            LoginWindow(root, on_success=go_main, db=db, mode_label=mode_label).pack(fill="both", expand=True)
     else:
         from ui.login_window import SetupWindow
         SetupWindow(root, on_done=go_main, db=db, mode_label=mode_label).pack(fill="both", expand=True)

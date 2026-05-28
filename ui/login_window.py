@@ -2,9 +2,45 @@
 登录窗口 - 首次打开注册管理员，之后登录
 """
 import os
+import json
+import hashlib
 import customtkinter as ctk
 from ui.styles import Colors, Fonts, Spacing, Radius
 from config import BASE_DIR
+
+_LOGIN_FILE = os.path.join(BASE_DIR, "data", ".last_login.json")
+
+
+def _save_login(username, password):
+    """保存登录凭据到本地文件"""
+    try:
+        os.makedirs(os.path.dirname(_LOGIN_FILE), exist_ok=True)
+        data = {"username": username, "password": password}
+        with open(_LOGIN_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+    except Exception:
+        pass
+
+
+def load_saved_login():
+    """读取保存的登录凭据，返回 (username, password) 或 None"""
+    try:
+        if os.path.exists(_LOGIN_FILE):
+            with open(_LOGIN_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data.get("username"), data.get("password")
+    except Exception:
+        pass
+    return None
+
+
+def clear_saved_login():
+    """清除保存的登录凭据（退出登录时调用）"""
+    try:
+        if os.path.exists(_LOGIN_FILE):
+            os.remove(_LOGIN_FILE)
+    except Exception:
+        pass
 
 from config import _find_resource
 LOGO_PATH = _find_resource("assets/logo.png")
@@ -31,6 +67,7 @@ class SetupWindow(ctk.CTkFrame):
         super().__init__(parent, fg_color=Colors.BG_MAIN)
         self.on_done = on_done
         self._db = db
+        self._mode_label = mode_label
 
         card = ctk.CTkFrame(self, fg_color=Colors.BG_CARD, corner_radius=Radius.XL,
                             border_width=1, border_color=Colors.BORDER,
@@ -208,6 +245,7 @@ class LoginWindow(ctk.CTkFrame):
             user = db.login(self.entry_user.get().strip(), self.entry_pass.get().strip())
             if user:
                 db.log("登录系统", f"用户 {user['username']} 登录", user["id"], user["username"])
+                _save_login(self.entry_user.get().strip(), self.entry_pass.get().strip())
                 self.on_success(user)
             else:
                 self.lbl_error.configure(text="用户名或密码错误")

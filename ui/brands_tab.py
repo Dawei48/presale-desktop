@@ -50,7 +50,8 @@ class BrandsTab(ctk.CTkFrame):
                       fg_color=Colors.PRIMARY, hover_color=Colors.PRIMARY_HOVER,
                       corner_radius=Radius.SM, command=self._add).pack(side="right")
 
-        self.list_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.list_frame = ctk.CTkScrollableFrame(self, fg_color="transparent",
+            scrollbar_button_color=Colors.BORDER, scrollbar_button_hover_color=Colors.TEXT_MUTED)
         self.list_frame.pack(fill="both", expand=True, padx=Spacing.XL, pady=(0, Spacing.XL))
 
     def _load(self):

@@ -201,7 +201,8 @@ class ProductsTab(ctk.CTkFrame):
                                         text_color=Colors.TEXT_MUTED)
         self.count_label.pack(anchor="w", padx=Spacing.XL, pady=(0, Spacing.SM))
 
-        self.list_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.list_frame = ctk.CTkScrollableFrame(self, fg_color="transparent",
+            scrollbar_button_color=Colors.BORDER, scrollbar_button_hover_color=Colors.TEXT_MUTED)
         self.list_frame.pack(fill="both", expand=True, padx=Spacing.XL, pady=(0, Spacing.XL))
 
     def _go_back(self):
@@ -218,6 +219,13 @@ class ProductsTab(ctk.CTkFrame):
         if not products:
             EmptyState(self.list_frame, "📦", "暂无产品").pack(fill="x")
             return
+
+        # 批量获取订单数（1次HTTP代替N次）
+        product_ids = [p["id"] for p in products]
+        try:
+            order_counts = self.db.get_order_counts_batch(product_ids)
+        except Exception:
+            order_counts = {}
 
         # 表头
         hdr = ctk.CTkFrame(self.list_frame, fg_color=Colors.SIDEBAR_BG,
@@ -263,8 +271,7 @@ class ProductsTab(ctk.CTkFrame):
                          text_color=Colors.PRIMARY).pack(side="left", padx=Spacing.SM)
 
             # 订单数 (70px)
-            order_count = len(self.db.get_orders(product_id=p["id"]))
-            ctk.CTkLabel(row, text=f"{order_count} 笔", font=Fonts.BODY, width=70, anchor="w",
+            ctk.CTkLabel(row, text=f"{order_counts.get(str(p['id']), 0)} 笔", font=Fonts.BODY, width=70, anchor="w",
                          text_color=Colors.TEXT_MUTED).pack(side="left", padx=Spacing.SM)
 
             # 操作按钮
