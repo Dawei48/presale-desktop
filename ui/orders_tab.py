@@ -6,6 +6,31 @@ import customtkinter as ctk
 from datetime import datetime, date
 from ui.styles import Colors, Fonts, Spacing, Radius
 from ui.components import Dialog, ConfirmDialog, Toast, EmptyState, STATUS_MAP
+from utils.csv_import import open_csv_import
+from config import SHIP_DEADLINE_DAYS, SHIP_WARN_DAYS
+
+
+def _ship_status(order):
+    """计算发货倒计时，返回 (文本, 颜色) 或 None（非 pending 订单不显示）"""
+    if order.get("status") != "pending":
+        return None
+    created = order.get("created_at", "")
+    if not created:
+        return None
+    ship_days = order.get("ship_days") or SHIP_DEADLINE_DAYS
+    try:
+        created_dt = datetime.strptime(created[:10], "%Y-%m-%d")
+        days_left = float(ship_days) - (datetime.now() - created_dt).days
+    except (ValueError, TypeError):
+        return None
+    if days_left < 0:
+        overdue = int(-days_left) + 1  # 向上取整
+        return f"⚠️ 已超时 {overdue} 天", Colors.DANGER
+    if days_left <= SHIP_WARN_DAYS:
+        remain = int(days_left) + 1 if days_left > int(days_left) else int(days_left)
+        return f"⚠️ 剩 {remain} 天", Colors.WARNING
+    remain = int(days_left)
+    return f"剩 {remain} 天", Colors.TEXT_MUTED
 
 
 class DatePicker(ctk.CTkFrame):
@@ -167,7 +192,7 @@ class OrderDialog(Dialog):
         self.product = product
         self.order = order
         self.on_save = on_save
-        super().__init__(parent, "编辑订单" if order else "新增订单", width=420, height=380)
+        super().__init__(parent, "编辑订单" if order else "新增订单", width=420, height=440)
 
         form = ctk.CTkFrame(self, fg_color="transparent")
         form.pack(fill="both", expand=True, padx=Spacing.XL, pady=Spacing.XL)
@@ -190,13 +215,23 @@ class OrderDialog(Dialog):
         self.date_picker = DatePicker(form, initial=initial_date if initial_date else None)
         self.date_picker.grid(row=5, column=1, sticky="w", pady=(Spacing.SM, 2), padx=Spacing.XS)
 
+        # 发货期限（天，支持小数，如 2 = 48小时）
+        ctk.CTkLabel(form, text="发货期限(天)", font=Fonts.BODY,
+                     text_color=Colors.TEXT_SECONDARY).grid(
+            row=6, column=0, sticky="w", pady=(Spacing.SM, 2), padx=Spacing.XS)
+        self.entry_ship_days = ctk.CTkEntry(form, font=Fonts.BODY, height=36,
+                                            border_color=Colors.BORDER, fg_color=Colors.BG_INPUT,
+                                            corner_radius=Radius.SM, placeholder_text="30")
+        self.entry_ship_days.grid(row=6, column=1, sticky="ew", pady=(Spacing.SM, 2), padx=Spacing.XS)
+
         if order:
             self.entry_order_no.insert(0, order.get("order_no", ""))
             self.entry_customer.insert(0, order.get("customer", ""))
             self.entry_qty.insert(0, str(order.get("quantity", 1)))
             self.entry_notes.insert(0, order.get("notes", ""))
+            self.entry_ship_days.insert(0, str(order.get("ship_days", SHIP_DEADLINE_DAYS)))
 
-        self._make_buttons(form, 6)
+        self._make_buttons(form, 7)
 
     def _on_ok(self):
         customer = self.entry_customer.get().strip()
@@ -208,11 +243,16 @@ class OrderDialog(Dialog):
         except ValueError:
             Toast(self, "数量必须是数字", "error")
             return
+        try:
+            ship_days = float(self.entry_ship_days.get() or SHIP_DEADLINE_DAYS)
+        except ValueError:
+            ship_days = SHIP_DEADLINE_DAYS
         self.result = {
             "order_no": self.entry_order_no.get().strip(),
             "customer": customer,
             "quantity": qty,
             "notes": self.entry_notes.get().strip(),
+            "ship_days": ship_days,
             "created_at": self.date_picker.get() + " " + datetime.now().strftime("%H:%M:%S"),
         }
         if self.on_save:
@@ -254,6 +294,14 @@ class OrdersTab(ctk.CTkFrame):
 
         ctk.CTkLabel(header, text=title, font=Fonts.H1,
                      text_color=Colors.TEXT_PRIMARY).pack(side="left", padx=(Spacing.SM, 0))
+
+        ctk.CTkButton(header, text="📥 导入CSV", font=Fonts.BODY_B, height=38,
+                      fg_color=Colors.PRIMARY_LIGHT, hover_color=Colors.PRIMARY_DIM,
+                      text_color=Colors.PRIMARY, corner_radius=Radius.MD,
+                      command=lambda: open_csv_import(
+                          self.winfo_toplevel(), self.db, self.current_user,
+                          product=self.product, brand=self.brand,
+                          on_done=self._load)).pack(side="right", padx=(0, Spacing.SM))
 
         ctk.CTkButton(header, text="＋ 新增订单", font=Fonts.BODY_B, height=38,
                       fg_color=Colors.PRIMARY, hover_color=Colors.PRIMARY_HOVER,
@@ -326,8 +374,8 @@ class OrdersTab(ctk.CTkFrame):
         table.pack(fill="x")
 
         # 列定义: (标题, 宽度)
-        cols = [("订单号", 130), ("客户", 80), ("产品", 120), ("数量", 50),
-                ("状态", 180), ("备注", 100), ("日期", 90), ("", 80)]
+        cols = [("订单号", 120), ("客户", 80), ("产品", 120), ("数量", 50),
+                ("状态", 180), ("备注", 90), ("日期/发货", 110), ("", 80)]
 
         # 表头
         hdr = ctk.CTkFrame(table, fg_color=Colors.SIDEBAR_BG, corner_radius=Radius.MD, height=38)
@@ -341,7 +389,7 @@ class OrdersTab(ctk.CTkFrame):
         # 数据行
         for idx, order in enumerate(orders):
             bg = Colors.BG_INPUT if idx % 2 == 0 else "transparent"
-            row = ctk.CTkFrame(table, fg_color=bg, corner_radius=Radius.SM, height=40)
+            row = ctk.CTkFrame(table, fg_color=bg, corner_radius=Radius.SM, height=48)
             row.pack(fill="x", pady=1)
             row.pack_propagate(False)
 
@@ -354,7 +402,7 @@ class OrdersTab(ctk.CTkFrame):
                 order.get("notes", ""),
                 order.get("created_at", "")[:10],
             ]
-            widths = [130, 80, 120, 50, 180, 100, 90, 80]
+            widths = [120, 80, 120, 50, 180, 90, 110, 80]
 
             for i, v in enumerate(vals):
                 if i == 4:
@@ -372,6 +420,16 @@ class OrdersTab(ctk.CTkFrame):
                                       corner_radius=Radius.SM,
                                       command=lambda o=order, sk=skey: self._set_status(o, sk)).pack(
                             side="left", padx=1)
+                elif i == 6:
+                    # 日期/发货列：日期 + 发货倒计时
+                    df = ctk.CTkFrame(row, fg_color="transparent")
+                    df.grid(row=0, column=i, sticky="w", padx=Spacing.SM)
+                    ctk.CTkLabel(df, text=v, font=Fonts.SMALL,
+                                 text_color=Colors.TEXT_PRIMARY, anchor="w").pack(anchor="w")
+                    ship = _ship_status(order)
+                    if ship:
+                        ctk.CTkLabel(df, text=ship[0], font=Fonts.TINY,
+                                     text_color=ship[1], anchor="w").pack(anchor="w")
                 else:
                     ctk.CTkLabel(row, text=v, font=Fonts.BODY,
                                  text_color=Colors.TEXT_PRIMARY, anchor="w",

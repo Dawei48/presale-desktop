@@ -45,7 +45,7 @@ def launch_app():
     db, cloud_error = get_database()
     root = ctk.CTk()
     root.title("放心预")
-    root.geometry("520x720")
+    root.geometry("900x620")
     root.resizable(False, False)
 
     # 窗口图标

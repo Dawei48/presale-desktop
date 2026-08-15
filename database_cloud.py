@@ -355,13 +355,24 @@ class Database:
             return o
         return None
 
-    def add_order(self, product_id, quantity=1, order_no="", customer="", notes="", created_at=None):
+    def get_order_by_no(self, order_no):
+        """按订单号查重，返回是否存在"""
+        if not order_no:
+            return False
+        try:
+            r = _api("orders", filters={"order_no": order_no}, limit=1)
+            return bool(r)
+        except Exception:
+            return False
+
+    def add_order(self, product_id, quantity=1, order_no="", customer="", notes="", created_at=None, ship_days=30):
         data = {
             "product_id": product_id,
             "quantity": quantity,
             "order_no": order_no,
             "customer": customer,
             "notes": notes,
+            "ship_days": ship_days,
         }
         if created_at:
             data["created_at"] = created_at
@@ -369,7 +380,7 @@ class Database:
         return r[0]["id"] if r else None
 
     def update_order(self, order_id, **kwargs):
-        allowed = {"product_id", "order_no", "customer", "quantity", "notes", "status", "created_at"}
+        allowed = {"product_id", "order_no", "customer", "quantity", "notes", "status", "created_at", "ship_days"}
         fields = {k: v for k, v in kwargs.items() if k in allowed and v is not None}
         if not fields:
             return

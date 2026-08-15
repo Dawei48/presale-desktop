@@ -1,5 +1,5 @@
 """
-登录窗口 - 首次打开注册管理员，之后登录
+登录窗口 - 分栏式：左侧品牌展示区 + 右侧登录/注册表单
 """
 import os
 import json
@@ -42,11 +42,12 @@ def clear_saved_login():
     except Exception:
         pass
 
+
 from config import _find_resource
 LOGO_PATH = _find_resource("assets/logo.png")
 
 
-def _load_logo():
+def _load_logo(size=72):
     """加载 logo 返回 CTkImage 或 None"""
     if not os.path.exists(LOGO_PATH):
         return None
@@ -54,10 +55,77 @@ def _load_logo():
         from PIL import Image
         from customtkinter import CTkImage
         img = Image.open(LOGO_PATH)
-        img.thumbnail((90, 90))
+        img.thumbnail((size, size))
         return CTkImage(light_image=img, dark_image=img, size=img.size)
     except Exception:
         return None
+
+
+# ── 品牌展示区（左栏，登录/注册共用）────────────────
+BRAND_SLOGAN = "让预售管理\n简单到只剩专注"
+BRAND_SUB = "面向陶瓷电商的 AI 预售管理工具"
+BRAND_FEATURES = [
+    ("🤖", "AI 智能导入", "各平台订单 CSV 一键识别"),
+    ("☁️", "云端多机同步", "团队协作数据实时共享"),
+    ("📄", "导出对接工厂", "Word 订单表自动生成"),
+]
+
+
+def _build_brand_panel(parent):
+    """构建左侧品牌展示区"""
+    panel = ctk.CTkFrame(parent, fg_color=Colors.SIDEBAR_BG, width=360, corner_radius=0)
+    panel.pack(side="left", fill="y")
+    panel.pack_propagate(False)
+
+    # 顶部 logo + 应用名
+    top = ctk.CTkFrame(panel, fg_color="transparent")
+    top.pack(fill="x", padx=40, pady=(44, 0))
+    logo = _load_logo(56)
+    if logo:
+        ctk.CTkLabel(top, image=logo, text="").pack(side="left")
+    else:
+        ctk.CTkLabel(top, text="🏺", font=(Fonts.FAMILY, 36)).pack(side="left")
+    name_box = ctk.CTkFrame(top, fg_color="transparent")
+    name_box.pack(side="left", padx=(12, 0))
+    ctk.CTkLabel(name_box, text="放心预", font=(Fonts.FAMILY, 20, "bold"),
+                 text_color=Colors.SIDEBAR_TEXT_HI).pack(anchor="w")
+    ctk.CTkLabel(name_box, text="预售管理系统", font=Fonts.TINY,
+                 text_color=Colors.SIDEBAR_TEXT).pack(anchor="w")
+
+    # 中部 slogan
+    mid = ctk.CTkFrame(panel, fg_color="transparent")
+    mid.pack(fill="x", padx=40, pady=(72, 0))
+    ctk.CTkLabel(mid, text=BRAND_SLOGAN, font=(Fonts.FAMILY, 26, "bold"),
+                 text_color=Colors.SIDEBAR_TEXT_HI, justify="left").pack(anchor="w")
+    ctk.CTkLabel(mid, text=BRAND_SUB, font=Fonts.SMALL,
+                 text_color=Colors.SIDEBAR_TEXT).pack(anchor="w", pady=(12, 0))
+
+    # 底部产品亮点
+    feat = ctk.CTkFrame(panel, fg_color="transparent")
+    feat.pack(side="bottom", fill="x", padx=40, pady=(0, 40))
+    for icon, title, desc in BRAND_FEATURES:
+        row = ctk.CTkFrame(feat, fg_color="transparent")
+        row.pack(fill="x", pady=6)
+        ctk.CTkLabel(row, text=icon, font=(Fonts.FAMILY, 18)).pack(side="left")
+        box = ctk.CTkFrame(row, fg_color="transparent")
+        box.pack(side="left", padx=(10, 0))
+        ctk.CTkLabel(box, text=title, font=Fonts.SMALL_B,
+                     text_color=Colors.SIDEBAR_TEXT_HI).pack(anchor="w")
+        ctk.CTkLabel(box, text=desc, font=Fonts.TINY,
+                     text_color=Colors.SIDEBAR_TEXT).pack(anchor="w")
+
+    return panel
+
+
+def _make_entry(parent, placeholder, show=None):
+    """创建带 focus 高亮的输入框"""
+    entry = ctk.CTkEntry(parent, placeholder_text=placeholder,
+                         font=Fonts.BODY, height=44,
+                         border_color=Colors.BORDER, fg_color=Colors.BG_INPUT,
+                         corner_radius=Radius.MD, show=show)
+    entry.bind("<FocusIn>", lambda e: entry.configure(border_color=Colors.PRIMARY, border_width=2))
+    entry.bind("<FocusOut>", lambda e: entry.configure(border_color=Colors.BORDER, border_width=1))
+    return entry
 
 
 class SetupWindow(ctk.CTkFrame):
@@ -69,73 +137,55 @@ class SetupWindow(ctk.CTkFrame):
         self._db = db
         self._mode_label = mode_label
 
-        card = ctk.CTkFrame(self, fg_color=Colors.BG_CARD, corner_radius=Radius.XL,
-                            border_width=1, border_color=Colors.BORDER,
-                            width=420, height=580)
-        card.place(relx=0.5, rely=0.5, anchor="center")
-        card.pack_propagate(False)
+        _build_brand_panel(self)
 
-        logo = _load_logo()
-        if logo:
-            ctk.CTkLabel(card, image=logo, text="").pack(pady=(20, 4))
-        else:
-            ctk.CTkLabel(card, text="📦", font=(Fonts.FAMILY, 36)).pack(pady=(24, 4))
-        ctk.CTkLabel(card, text="欢迎使用 放心预", font=Fonts.H1,
-                     text_color=Colors.TEXT_PRIMARY).pack()
-        ctk.CTkLabel(card, text="首次使用，请创建管理员账号", font=Fonts.SMALL,
-                     text_color=Colors.TEXT_MUTED).pack(pady=(0, 20))
+        # 右侧表单
+        right = ctk.CTkFrame(self, fg_color=Colors.BG_MAIN, corner_radius=0)
+        right.pack(side="right", fill="both", expand=True)
+        form = ctk.CTkFrame(right, fg_color="transparent", width=360)
+        form.place(relx=0.5, rely=0.5, anchor="center")
 
-        form = ctk.CTkFrame(card, fg_color="transparent")
-        form.pack(fill="x", padx=32)
+        ctk.CTkLabel(form, text="创建管理员账号", font=Fonts.TITLE,
+                     text_color=Colors.TEXT_PRIMARY).pack(anchor="w")
+        ctk.CTkLabel(form, text="首次使用，请设置管理员信息", font=Fonts.SMALL,
+                     text_color=Colors.TEXT_MUTED).pack(anchor="w", pady=(4, 28))
 
-        ctk.CTkLabel(form, text="管理员用户名 *", font=Fonts.SMALL_B,
+        ctk.CTkLabel(form, text="管理员用户名", font=Fonts.SMALL_B,
                      text_color=Colors.TEXT_SECONDARY).pack(anchor="w")
-        self.entry_user = ctk.CTkEntry(form, placeholder_text="用于登录",
-                                       font=Fonts.BODY, height=36,
-                                       border_color=Colors.BORDER, fg_color=Colors.BG_INPUT,
-                                       corner_radius=Radius.SM)
-        self.entry_user.pack(fill="x", pady=(4, 10))
+        self.entry_user = _make_entry(form, "用于登录")
+        self.entry_user.pack(fill="x", pady=(6, 14))
 
-        ctk.CTkLabel(form, text="显示名称 *", font=Fonts.SMALL_B,
+        ctk.CTkLabel(form, text="显示名称", font=Fonts.SMALL_B,
                      text_color=Colors.TEXT_SECONDARY).pack(anchor="w")
-        self.entry_name = ctk.CTkEntry(form, placeholder_text="你的名字",
-                                       font=Fonts.BODY, height=36,
-                                       border_color=Colors.BORDER, fg_color=Colors.BG_INPUT,
-                                       corner_radius=Radius.SM)
-        self.entry_name.pack(fill="x", pady=(4, 10))
+        self.entry_name = _make_entry(form, "你的名字")
+        self.entry_name.pack(fill="x", pady=(6, 14))
 
-        ctk.CTkLabel(form, text="密码 *", font=Fonts.SMALL_B,
+        ctk.CTkLabel(form, text="密码", font=Fonts.SMALL_B,
                      text_color=Colors.TEXT_SECONDARY).pack(anchor="w")
-        self.entry_pass = ctk.CTkEntry(form, placeholder_text="请设置密码（至少4位）",
-                                       font=Fonts.BODY, height=36,
-                                       border_color=Colors.BORDER, fg_color=Colors.BG_INPUT,
-                                       corner_radius=Radius.SM, show="•")
-        self.entry_pass.pack(fill="x", pady=(4, 16))
+        self.entry_pass = _make_entry(form, "至少 4 位", show="•")
+        self.entry_pass.pack(fill="x", pady=(6, 20))
 
-        # 回车键提交
         self.entry_pass.bind("<Return>", lambda e: self._do_setup())
         self.entry_user.bind("<Return>", lambda e: self.entry_name.focus())
         self.entry_name.bind("<Return>", lambda e: self.entry_pass.focus())
 
-        self.lbl_error = ctk.CTkLabel(card, text="", font=Fonts.SMALL,
-                                      text_color=Colors.DANGER)
-        self.lbl_error.pack()
+        self.lbl_error = ctk.CTkLabel(form, text="", font=Fonts.SMALL, text_color=Colors.DANGER)
+        self.lbl_error.pack(anchor="w")
 
-        ctk.CTkButton(form, text="创建管理员账号", font=Fonts.BODY_B, height=40,
+        ctk.CTkButton(form, text="创建管理员账号", font=Fonts.BODY_B, height=44,
                       fg_color=Colors.PRIMARY, hover_color=Colors.PRIMARY_HOVER,
-                      corner_radius=Radius.SM,
-                      command=self._do_setup).pack(fill="x", pady=(0, 0))
+                      corner_radius=Radius.MD, command=self._do_setup).pack(fill="x", pady=(12, 16))
 
-        ctk.CTkLabel(card, text="", font=Fonts.SMALL, text_color=Colors.TEXT_MUTED).pack()
-        ctk.CTkButton(card, text="已有账号？去登录", font=Fonts.SMALL,
-                      fg_color=None, hover_color=None,
+        ctk.CTkButton(form, text="已有账号？去登录", font=Fonts.SMALL,
+                      fg_color="transparent", hover_color=Colors.BG_HOVER,
                       text_color=Colors.PRIMARY, height=28,
-                      command=self._go_login).pack(pady=(4, 0))
+                      command=self._go_login).pack()
 
     def _go_login(self):
         for w in self.master.winfo_children():
             w.destroy()
-        LoginWindow(self.master, on_success=self.on_done, db=self._db, mode_label=self._mode_label).pack(fill="both", expand=True)
+        LoginWindow(self.master, on_success=self.on_done, db=self._db,
+                    mode_label=self._mode_label).pack(fill="both", expand=True)
 
     def _do_setup(self):
         username = self.entry_user.get().strip()
@@ -174,67 +224,54 @@ class LoginWindow(ctk.CTkFrame):
         self._db = db
         self._mode_label = mode_label
 
-        card = ctk.CTkFrame(self, fg_color=Colors.BG_CARD, corner_radius=Radius.XL,
-                            border_width=1, border_color=Colors.BORDER,
-                            width=420, height=520)
-        card.place(relx=0.5, rely=0.5, anchor="center")
-        card.pack_propagate(False)
+        _build_brand_panel(self)
 
-        logo = _load_logo()
-        if logo:
-            ctk.CTkLabel(card, image=logo, text="").pack(pady=(20, 4))
-        else:
-            ctk.CTkLabel(card, text="📦", font=(Fonts.FAMILY, 36)).pack(pady=(28, 4))
-        ctk.CTkLabel(card, text="放心预", font=Fonts.TITLE,
-                     text_color=Colors.TEXT_PRIMARY).pack()
-        ctk.CTkLabel(card, text="预售管理系统", font=Fonts.SMALL,
-                     text_color=Colors.TEXT_MUTED).pack(pady=(0, 4))
-        if self._mode_label:
-            color = Colors.SUCCESS if "云端" in self._mode_label else Colors.WARNING
-            ctk.CTkLabel(card, text=self._mode_label, font=Fonts.TINY,
-                         text_color=color).pack(pady=(0, 16))
+        # 右侧表单
+        right = ctk.CTkFrame(self, fg_color=Colors.BG_MAIN, corner_radius=0)
+        right.pack(side="right", fill="both", expand=True)
+        form = ctk.CTkFrame(right, fg_color="transparent", width=360)
+        form.place(relx=0.5, rely=0.5, anchor="center")
 
-        form = ctk.CTkFrame(card, fg_color="transparent")
-        form.pack(fill="x", padx=32)
+        ctk.CTkLabel(form, text="欢迎回来", font=Fonts.TITLE,
+                     text_color=Colors.TEXT_PRIMARY).pack(anchor="w")
+        ctk.CTkLabel(form, text="登录放心预，继续管理你的预售订单", font=Fonts.SMALL,
+                     text_color=Colors.TEXT_MUTED).pack(anchor="w", pady=(4, 28))
 
         ctk.CTkLabel(form, text="用户名", font=Fonts.SMALL_B,
                      text_color=Colors.TEXT_SECONDARY).pack(anchor="w")
-        self.entry_user = ctk.CTkEntry(form, placeholder_text="请输入用户名",
-                                       font=Fonts.BODY, height=38,
-                                       border_color=Colors.BORDER, fg_color=Colors.BG_INPUT,
-                                       corner_radius=Radius.SM)
-        self.entry_user.pack(fill="x", pady=(4, 12))
+        self.entry_user = _make_entry(form, "请输入用户名")
+        self.entry_user.pack(fill="x", pady=(6, 14))
 
         ctk.CTkLabel(form, text="密码", font=Fonts.SMALL_B,
                      text_color=Colors.TEXT_SECONDARY).pack(anchor="w")
-        self.entry_pass = ctk.CTkEntry(form, placeholder_text="请输入密码",
-                                       font=Fonts.BODY, height=38,
-                                       border_color=Colors.BORDER, fg_color=Colors.BG_INPUT,
-                                       corner_radius=Radius.SM, show="•")
-        self.entry_pass.pack(fill="x", pady=(4, 16))
+        self.entry_pass = _make_entry(form, "请输入密码", show="•")
+        self.entry_pass.pack(fill="x", pady=(6, 20))
 
-        # 回车键登录
         self.entry_pass.bind("<Return>", lambda e: self._do_login())
         self.entry_user.bind("<Return>", lambda e: self.entry_pass.focus())
 
-        ctk.CTkButton(form, text="登 录", font=Fonts.H2, height=42,
+        if self._mode_label:
+            color = Colors.SUCCESS if "云端" in self._mode_label else Colors.WARNING
+            ctk.CTkLabel(form, text=self._mode_label, font=Fonts.TINY,
+                         text_color=color).pack(anchor="w", pady=(0, 8))
+
+        self.lbl_error = ctk.CTkLabel(form, text="", font=Fonts.SMALL, text_color=Colors.DANGER)
+        self.lbl_error.pack(anchor="w")
+
+        ctk.CTkButton(form, text="登 录", font=Fonts.H2, height=44,
                       fg_color=Colors.PRIMARY, hover_color=Colors.PRIMARY_HOVER,
-                      corner_radius=Radius.SM,
-                      command=self._do_login).pack(fill="x")
+                      corner_radius=Radius.MD, command=self._do_login).pack(fill="x", pady=(12, 16))
 
-        self.lbl_error = ctk.CTkLabel(card, text="", font=Fonts.SMALL,
-                                      text_color=Colors.DANGER)
-        self.lbl_error.pack(pady=(8, 0))
-
-        ctk.CTkButton(card, text="还没有账号？去注册", font=Fonts.SMALL,
-                      fg_color=None, hover_color=None,
+        ctk.CTkButton(form, text="还没有账号？去注册", font=Fonts.SMALL,
+                      fg_color="transparent", hover_color=Colors.BG_HOVER,
                       text_color=Colors.PRIMARY, height=28,
-                      command=self._go_setup).pack(pady=(4, 0))
+                      command=self._go_setup).pack()
 
     def _go_setup(self):
         for w in self.master.winfo_children():
             w.destroy()
-        SetupWindow(self.master, on_done=self.on_success, db=self._db, mode_label=self._mode_label).pack(fill="both", expand=True)
+        SetupWindow(self.master, on_done=self.on_success, db=self._db,
+                    mode_label=self._mode_label).pack(fill="both", expand=True)
 
     def _do_login(self):
         try:

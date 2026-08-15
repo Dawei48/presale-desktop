@@ -72,7 +72,7 @@ class ProductDialog(Dialog):
                       command=self._pick_image).pack(anchor="w")
         if self.image_path:
             ctk.CTkButton(btn_col, text="✕ 移除", font=Fonts.SMALL, height=32,
-                          fg_color=Colors.DANGER_LIGHT, hover_color="#FECACA",
+                          fg_color=Colors.DANGER_LIGHT, hover_color=Colors.DANGER_LIGHT_HOVER,
                           text_color=Colors.DANGER, corner_radius=Radius.MD,
                           command=self._remove_image).pack(anchor="w", pady=(4, 0))
 

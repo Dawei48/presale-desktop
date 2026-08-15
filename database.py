@@ -69,6 +69,7 @@ class Database:
                     quantity    INTEGER DEFAULT 1,
                     notes       TEXT DEFAULT '',
                     status      TEXT DEFAULT 'pending',
+                    ship_days   REAL DEFAULT 30,
                     created_at  TEXT DEFAULT (datetime('now','localtime')),
                     updated_at  TEXT DEFAULT (datetime('now','localtime')),
                     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
@@ -89,6 +90,10 @@ class Database:
             cols = [r[1] for r in conn.execute("PRAGMA table_info(products)").fetchall()]
             if "image_path" not in cols:
                 conn.execute("ALTER TABLE products ADD COLUMN image_path TEXT DEFAULT ''")
+            # 迁移: orders 加 ship_days（发货期限天数）
+            ocols = [r[1] for r in conn.execute("PRAGMA table_info(orders)").fetchall()]
+            if "ship_days" not in ocols:
+                conn.execute("ALTER TABLE orders ADD COLUMN ship_days REAL DEFAULT 30")
 
 # 首次安装不再创建默认账号，由用户自己注册管理员
 
@@ -279,22 +284,32 @@ class Database:
             ).fetchone()
             return dict(row) if row else None
 
-    def add_order(self, product_id, quantity=1, order_no="", customer="", notes="", created_at=None):
+    def get_order_by_no(self, order_no):
+        """按订单号查重，返回是否存在"""
+        if not order_no:
+            return False
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT id FROM orders WHERE order_no=? LIMIT 1", (order_no,)
+            ).fetchone()
+            return bool(row)
+
+    def add_order(self, product_id, quantity=1, order_no="", customer="", notes="", created_at=None, ship_days=30):
         with self._conn() as conn:
             if created_at:
                 cur = conn.execute(
-                    "INSERT INTO orders (product_id, order_no, customer, quantity, notes, created_at) VALUES (?,?,?,?,?,?)",
-                    (product_id, order_no, customer, quantity, notes, created_at)
+                    "INSERT INTO orders (product_id, order_no, customer, quantity, notes, created_at, ship_days) VALUES (?,?,?,?,?,?,?)",
+                    (product_id, order_no, customer, quantity, notes, created_at, ship_days)
                 )
             else:
                 cur = conn.execute(
-                    "INSERT INTO orders (product_id, order_no, customer, quantity, notes) VALUES (?,?,?,?,?)",
-                    (product_id, order_no, customer, quantity, notes)
+                    "INSERT INTO orders (product_id, order_no, customer, quantity, notes, ship_days) VALUES (?,?,?,?,?,?)",
+                    (product_id, order_no, customer, quantity, notes, ship_days)
                 )
             return cur.lastrowid
 
     def update_order(self, order_id, **kwargs):
-        allowed = {"product_id", "order_no", "customer", "quantity", "notes", "status", "created_at"}
+        allowed = {"product_id", "order_no", "customer", "quantity", "notes", "status", "created_at", "ship_days"}
         fields = {k: v for k, v in kwargs.items() if k in allowed and v is not None}
         if not fields:
             return

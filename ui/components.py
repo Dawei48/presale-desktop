@@ -91,7 +91,7 @@ class ConfirmDialog(ctk.CTkToplevel):
                       text_color=Colors.TEXT_SECONDARY, corner_radius=Radius.SM,
                       command=self.destroy).pack(side="right", padx=(Spacing.SM, 0))
         ctk.CTkButton(btn_frame, text="确定", font=Fonts.BODY_B, width=80, height=34,
-                      fg_color=Colors.DANGER, hover_color="#DC2626", corner_radius=Radius.SM,
+                      fg_color=Colors.DANGER, hover_color=Colors.DANGER_HOVER, corner_radius=Radius.SM,
                       command=self._confirm).pack(side="right")
 
     def _confirm(self):

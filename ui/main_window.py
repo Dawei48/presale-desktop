@@ -11,6 +11,7 @@ from ui.orders_tab import OrdersTab
 from ui.search_tab import SearchTab
 from ui.team_tab import TeamTab
 from utils.docx_export import export_brand_orders_docx
+from utils.csv_import import open_csv_import
 
 
 class MainWindow(ctk.CTkFrame):
@@ -125,7 +126,7 @@ class MainWindow(ctk.CTkFrame):
         toolbar = ctk.CTkFrame(self.content, fg_color="transparent")
         toolbar.pack(fill="x", padx=Spacing.XL, pady=(Spacing.XL, 0))
         ctk.CTkButton(toolbar, text="📄 导出品牌订单", font=Fonts.BODY_B, height=36,
-                      fg_color=Colors.SUCCESS, hover_color="#059669", corner_radius=Radius.SM,
+                      fg_color=Colors.SUCCESS, hover_color=Colors.SUCCESS_HOVER, corner_radius=Radius.SM,
                       command=self._export_by_brand).pack(side="right")
         OrdersTab(self.content, self.db, self.user_info).pack(fill="both", expand=True)
 
@@ -193,7 +194,7 @@ class MainWindow(ctk.CTkFrame):
                       text_color=Colors.TEXT_SECONDARY, corner_radius=Radius.SM,
                       command=dialog.destroy).pack(side="right", padx=(Spacing.SM, 0))
         ctk.CTkButton(btn_frame, text="导出", font=Fonts.BODY_B, width=100, height=34,
-                      fg_color=Colors.SUCCESS, hover_color="#059669", corner_radius=Radius.SM,
+                      fg_color=Colors.SUCCESS, hover_color=Colors.SUCCESS_HOVER, corner_radius=Radius.SM,
                       command=do_export).pack(side="right")
 
     def _logout(self):
@@ -205,7 +206,7 @@ class MainWindow(ctk.CTkFrame):
                         self.user_info["id"], self.user_info["username"])
             for w in self.master.winfo_children():
                 w.destroy()
-            self.master.geometry("440x640")
+            self.master.geometry("900x620")
             self.master.minsize(100, 100)
             self.master.resizable(False, False)
             from ui.login_window import LoginWindow

@@ -21,8 +21,8 @@ build/
 # 截图/临时文件
 *.png
 *.jpg
+*.log
 test_gui.py
-error.log
 build/
 *.spec
 

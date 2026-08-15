@@ -5,7 +5,7 @@ import os
 import sys
 
 APP_NAME = "放心预"
-APP_VERSION = "1.3.1"
+APP_VERSION = "1.6.0"
 APP_SUBTITLE = "预售管理系统"
 
 if getattr(sys, 'frozen', False):
@@ -58,3 +58,35 @@ STATUS_COLORS = {
 }
 
 FONT_FAMILY = "Microsoft YaHei"
+
+# ── AI 解析配置 ──────────────────────────────
+# AI key 优先级：环境变量 > 本地文件（data/ai_key.txt，已被 .gitignore 排除）
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "").strip()
+if not DEEPSEEK_API_KEY:
+    _ai_key_file = os.path.join(DATA_DIR, "ai_key.txt")
+    if os.path.exists(_ai_key_file):
+        try:
+            with open(_ai_key_file, "r", encoding="utf-8") as f:
+                DEEPSEEK_API_KEY = f.read().strip()
+        except Exception:
+            pass
+
+DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions"
+DEEPSEEK_MODEL = "deepseek-chat"
+
+# ── 发货期限（天，订单级可单独覆盖）────────
+# 订单超过自身发货期限仍未发货，会在列表中标红提示
+SHIP_DEADLINE_DAYS = 30   # 默认发货期限（无平台信息时用）
+SHIP_WARN_DAYS = 3        # 剩余 ≤3 天时黄色预警
+
+# 各平台默认发货期限（导入 CSV 时按检测到的平台自动设置）
+PLATFORM_SHIP_DAYS = {
+    "taobao": 3,    # 淘宝默认 72 小时 ≈ 3 天
+    "pdd": 3,       # 拼多多默认 72 小时
+    "douyin": 2,    # 抖音 48 小时 = 2 天
+    "unknown": 30,  # 未知平台/预售商品默认 30 天
+}
+
+def ai_enabled():
+    """AI 解析是否可用"""
+    return bool(DEEPSEEK_API_KEY)
