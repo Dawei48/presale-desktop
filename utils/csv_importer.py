@@ -189,7 +189,10 @@ def import_csv_file(db, path, use_ai=True):
             except Exception:
                 pid = fallback_pid
 
-        db.add_order(
+        otype = detect_order_type(notes)
+        # 初始状态跟着类型走：预售要先跟客户确认延发，预存直接挂账，现货等发货
+        init_status = {"presale": "confirm", "stored": "stored", "normal": "ready"}[otype]
+        new_id = db.add_order(
             product_id=pid,
             quantity=qty,
             order_no=order_no,
@@ -197,7 +200,7 @@ def import_csv_file(db, path, use_ai=True):
             notes=notes,
             created_at=_norm_date(_get(row, idx["created_at"])),
             ship_days=PLATFORM_DAYS["unknown"],
-            order_type=detect_order_type(notes),
+            order_type=otype,
             goods_name=goods,
             spec=_get(row, idx["spec"]),
             receiver_name=_get(row, idx["customer"]),
@@ -205,6 +208,10 @@ def import_csv_file(db, path, use_ai=True):
             receiver_addr=_get(row, idx["receiver_addr"]),
             amount=_amount(_get(row, idx["amount"])),
         )
+        try:
+            db.update_order(new_id, status=init_status)
+        except Exception:
+            pass
         added += 1
 
     return {"added": added, "dup": dup, "invalid": invalid,

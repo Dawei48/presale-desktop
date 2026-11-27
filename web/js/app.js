@@ -540,6 +540,29 @@
     r.appendChild(el('div'));
     r.appendChild(sw);
     wrap.appendChild(r);
+
+    // 数据存在哪 —— 本地模式下这句必须让用户看见
+    const head2 = el('div', 'group-head');
+    head2.appendChild(el('h2', null, '数据'));
+    wrap.appendChild(head2);
+
+    const r2 = el('div', 'row');
+    r2.style.cursor = 'default';
+    r2.appendChild(el('div', 'cust', '本地存储'));
+    const it2 = el('div', 'item');
+    it2.appendChild(el('div', 'g', S.settings.data_dir || 'data'));
+    it2.appendChild(el('div', 'm',
+      '每天启动自动备份一份，保留最近 7 天 · ' +
+      (S.settings.db_size ? (S.settings.db_size / 1024).toFixed(0) + ' KB' : '还没有数据')));
+    r2.appendChild(it2);
+    r2.appendChild(el('div', 'qty', ''));
+    const acts2 = el('div', 'acts');
+    const openBtn = el('button', 'act', '打开文件夹');
+    openBtn.addEventListener('click', () => API.openPath(S.settings.data_dir || ''));
+    acts2.appendChild(openBtn);
+    r2.appendChild(acts2);
+    wrap.appendChild(r2);
+
     list.appendChild(wrap);
   }
 

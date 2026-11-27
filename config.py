@@ -33,7 +33,7 @@ os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(IMAGES_DIR, exist_ok=True)
 
 # ── 云端模式 ──────────────────────────────────
-USE_CLOUD = True  # True=Supabase云端, False=本地SQLite
+USE_CLOUD = False  # False=本地SQLite（当前），True=Supabase云端
 
 SUPABASE_URL = "https://xhcbsvfysuxqzfudkkwl.supabase.co"
 SUPABASE_KEY = "sb_publishable_CqIEa-ijlbZ3SbbEYXrTsQ_ZRR91HtB"

@@ -57,7 +57,12 @@ class WebApi:
 
     def get_settings(self):
         try:
-            return {"ok": True, "data": self.settings}
+            from config import DATA_DIR, DB_PATH
+            data = dict(self.settings)
+            data["data_dir"] = DATA_DIR
+            data["db_path"] = DB_PATH
+            data["db_size"] = os.path.getsize(DB_PATH) if os.path.exists(DB_PATH) else 0
+            return {"ok": True, "data": data}
         except Exception as e:
             return _err(e)
 

@@ -68,8 +68,42 @@ def apply_dark_titlebar(window, theme="dark"):
         pass
 
 
+def backup_local_db():
+    """本地模式的命根子只有一个 .db 文件，每天启动时先备份一份，留最近 7 天。
+    用 sqlite3 的 backup API，而不是 copy2 —— WAL 模式下直接复制文件可能拿到半截数据。"""
+    import glob
+    import sqlite3
+    from datetime import datetime
+    from config import DB_PATH, DATA_DIR
+
+    if not os.path.exists(DB_PATH):
+        return
+    bdir = os.path.join(DATA_DIR, "backup")
+    os.makedirs(bdir, exist_ok=True)
+    dest = os.path.join(bdir, f"presale_{datetime.now():%Y%m%d}.db")
+    if os.path.exists(dest):
+        return
+    try:
+        src = sqlite3.connect(DB_PATH)
+        dst = sqlite3.connect(dest)
+        with dst:
+            src.backup(dst)
+        dst.close()
+        src.close()
+        old = sorted(glob.glob(os.path.join(bdir, "presale_*.db")))
+        for f in old[:-7]:
+            try:
+                os.remove(f)
+            except OSError:
+                pass
+    except Exception as e:
+        print("备份失败（不影响使用）：", e)
+
+
 def launch():
     db, cloud_err = get_database()
+    if cloud_err is None:
+        backup_local_db()
 
     index = _find_resource("web/index.html")
     if not os.path.exists(index):
