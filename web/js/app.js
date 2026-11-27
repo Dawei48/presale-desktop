@@ -908,6 +908,10 @@
   }
 
   function start() {
+    if (globalThis.BRAND_LOGO) {
+      const m = document.getElementById('brand-mark');
+      if (m) m.src = globalThis.BRAND_LOGO;
+    }
     document.getElementById('list').style.paddingBottom = '28px';
     initTheme();
     bindChrome();

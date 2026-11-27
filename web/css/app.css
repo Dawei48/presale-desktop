@@ -123,11 +123,10 @@ button{font:inherit;color:inherit}
 }
 .rail-top{height:56px;display:flex;align-items:center;gap:9px;padding:0 10px;flex:0 0 56px}
 .logo{
-  width:23px;height:23px;flex:0 0 23px;border-radius:6px;
-  background:var(--signal);display:grid;place-items:center;
-  transition:background-color .18s linear;
+  width:30px;height:30px;flex:0 0 30px;
+  object-fit:contain;display:block;
+  /* 朱砂印章本身就是品牌色，不加背景块 */
 }
-.logo svg{width:13px;height:13px;stroke:var(--signal-ink)}
 .wordmark{font-size:13.5px;font-weight:600;letter-spacing:.03em}
 
 .rail-label{font-size:var(--t-micro);color:var(--ink-4);padding:13px 10px 5px}

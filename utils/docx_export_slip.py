@@ -133,10 +133,14 @@ def export_production_docx(kiln_name, orders, filepath, brand_name=None):
         key = (name, spec)
         if key not in merged:
             merged[key] = {
-                "name": name, "spec": spec, "qty": 0, "notes": [],
+                "name": name, "spec": spec, "qty": 0, "notes": [], "amount": 0.0,
                 "image": o.get("product_image_path") or o.get("image_path") or "",
             }
         merged[key]["qty"] += int(o.get("quantity") or 1)
+        try:
+            merged[key]["amount"] += float(o.get("amount") or 0)
+        except (TypeError, ValueError):
+            pass
         note = (o.get("notes") or "").strip()
         if note and note not in merged[key]["notes"]:
             merged[key]["notes"].append(note)
@@ -178,17 +182,20 @@ def export_production_docx(kiln_name, orders, filepath, brand_name=None):
 
     # ── 副信息 ──
     total_qty = sum(i["qty"] for i in items)
+    total_amt = sum(i.get("amount") or 0 for i in items)
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p.paragraph_format.space_after = Pt(12)
     meta = f"{datetime.now():%Y年%m月%d日}　共 {len(items)} 款　{total_qty} 件"
+    if total_amt:
+        meta += f"　¥{total_amt:,.0f}"
     if brand_name:
         meta = brand_name + "　" + meta
     _set_run(p.add_run(meta), size=9.5, color=INK_2)
 
     # ── 表格 ──
-    headers = [("产品图片", Cm(2.9)), ("产品名称", Cm(7.4)),
-               ("规格", Cm(2.6)), ("数量", Cm(1.5)), ("备注", Cm(2.8))]
+    headers = [("产品图片", Cm(2.9)), ("产品名称", Cm(7.6)),
+               ("数量", Cm(1.5)), ("价格", Cm(2.4)), ("备注", Cm(2.9))]
     table = doc.add_table(rows=1 + len(items), cols=len(headers))
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     table.autofit = False
@@ -228,9 +235,10 @@ def export_production_docx(kiln_name, orders, filepath, brand_name=None):
             _cell(cell_img, "—", size=9, color=INK_3, align=WD_ALIGN_PARAGRAPH.CENTER)
 
         _cell(row.cells[1], it["name"], size=10.5, bold=True)
-        _cell(row.cells[2], it["spec"] or "—", size=9.5, color=INK_2,
-              align=WD_ALIGN_PARAGRAPH.CENTER)
-        _cell(row.cells[3], it["qty"], size=11, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER)
+        _cell(row.cells[2], it["qty"], size=11, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER)
+        amt = it.get("amount") or 0
+        _cell(row.cells[3], f"¥{amt:,.0f}" if amt else "—", size=10,
+              color=INK, align=WD_ALIGN_PARAGRAPH.CENTER)
         _cell(row.cells[4], "、".join(it["notes"]) or "", size=9, color=INK_2)
 
         if ri % 2 == 0:
@@ -242,7 +250,10 @@ def export_production_docx(kiln_name, orders, filepath, brand_name=None):
     p.paragraph_format.space_before = Pt(8)
     p.paragraph_format.space_after = Pt(0)
     p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    _set_run(p.add_run(f"合计　{len(items)} 款　{total_qty} 件"), size=10.5, bold=True)
+    tail = f"合计　{len(items)} 款　{total_qty} 件"
+    if total_amt:
+        tail += f"　¥{total_amt:,.0f}"
+    _set_run(p.add_run(tail), size=10.5, bold=True)
 
     # ── 落款 ──
     doc.add_paragraph().paragraph_format.space_after = Pt(2)
