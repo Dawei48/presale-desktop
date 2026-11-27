@@ -92,15 +92,23 @@
 
 ```bash
 pip install -r requirements.txt
-python main_web.py          # 直接跑
-python audit.py             # 66 项自审
-python selfcheck.py         # 业务逻辑自审
+python main_web.py              # 直接跑
+python audit.py                 # 71 项静态/API/导出/打包自审
+python selfcheck.py             # 业务逻辑自审
+python tests/e2e_bridge.py      # 端到端：真开窗口、真点按钮、回库核对
 ```
+
+`tests/e2e_bridge.py` 是最重要的一关。它会真的打开窗口点「标记已同意」，
+然后回数据库确认状态真的变了——因为「界面看起来正常」和「数据是真的」
+完全是两回事，v2.0.1 之前就栽在这上面（见版本记录）。
 
 用浏览器直接打开 `web/index.html` 会进**预览模式**（假数据），方便调样式，不会碰真实数据库。
 
 ## 版本
 
+- **v2.0.1** — 修致命 bug：前端超时用 `Promise.race` 包 pywebview 的 thenable
+  会永不 settle，导致界面一直显示 mock 假数据还假装已同步。顺带删掉 3698 行
+  旧架构代码、移除 config 里的硬编码凭据
 - **v2.0.0** — 界面重写：pywebview + 双主题 + 窑口生产单 + 网图查找 + 全本地存储
 - v1.6.0 — 青花瓷主题 UI、AI 智能导入、智能查重、订单级发货期限
 - v1.4.0 — 云端协作模式，多机数据同步
