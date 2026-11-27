@@ -21,7 +21,7 @@
 
   /* ── 状态 ──────────────────────────────────────────────────── */
   const S = {
-    page: 'todo',
+    page: 'orders',
     filter: 'all',
     keyword: '',
     rows: [],
@@ -34,7 +34,6 @@
   };
 
   const PAGE_META = {
-    todo:       { title: '待办',     showFilters: true },
     orders:     { title: '全部订单', showFilters: true },
     kilns:      { title: '窑口',     showFilters: false },
     products:   { title: '商品库',   showFilters: false },
@@ -90,12 +89,11 @@
     S.error = null;
     render();
 
-    if (page === 'todo' || page === 'orders') {
+    if (page === 'orders') {
       const r = await API.orders(S.filter, S.keyword);
       S.loading = false;
       if (!r.ok) { S.error = r.error; S.rows = []; }
-      else { S.rows = r.data.rows || []; S.counts = r.data.counts || {}; S.todo = r.data.todo || 0; }
-      if (page === 'todo') buildGroups();
+      else { S.rows = r.data.rows || []; S.counts = r.data.counts || {}; }
       render();
     } else if (page === 'kilns') {
       const r = await API.kilns();
@@ -125,28 +123,6 @@
     updateSub();
   }
 
-  function buildGroups() {
-    const order = ['confirm', 'producing', 'ready', 'stored'];
-    const label = {
-      confirm: '待确认延发', producing: '待生产', ready: '待发货',
-      stored: '预存挂账', shipped: '已发货', done: '已完成',
-    };
-    const hint = {
-      confirm: '在平台发延后发货申请，客户同意后转生产',
-      producing: '按窑口合并后可一次导出生产单',
-      ready: '现货优先，48 小时内必须出库',
-      stored: '消费券挂账，不发货不生产',
-    };
-    const map = {};
-    S.rows.forEach(o => {
-      const k = o.status || 'ready';
-      (map[k] = map[k] || []).push(o);
-    });
-    S.groups = order
-      .filter(k => map[k] && map[k].length)
-      .map(k => ({ key: k, label: label[k], hint: hint[k] || '', rows: map[k] }));
-  }
-
   function buildProduction() {
     // 生产单：按窑口聚合
     const map = {};
@@ -160,28 +136,18 @@
     }));
   }
 
-  function todoCount() {
-    const c = S.counts || {};
-    return (c.confirm || 0) + (c.producing || 0) + (c.ready || 0);
-  }
-
   function refreshNav() {
     const c = S.counts || {};
-    $('#nav-todo').textContent = c.total != null ? todoCount() : '–';
     $('#nav-orders').textContent = c.total != null ? c.total : '–';
     $('#nav-prod').textContent = (c.confirm || 0) + (c.producing || 0) || '–';
   }
 
   function updateSub() {
     const c = S.counts || {};
-    if (S.page === 'todo') {
-      const urgent = c.confirm || 0;
-      $('#page-sub').textContent = '';
-      const b1 = el('b', null, todoCount() + ' 单');
-      const b2 = el('b', null, urgent + ' 单');
-      $('#page-sub').append('今天 ', b1, ' 没走完，', b2, ' 在等你动手');
-    } else if (S.page === 'orders') {
-      $('#page-sub').textContent = '共 ' + (c.total || S.rows.length) + ' 单，按导入时间倒序';
+    if (S.page === 'orders') {
+      const urgent = (c.confirm || 0) + (c.producing || 0);
+      $('#page-sub').textContent = '共 ' + (c.total || S.rows.length) + ' 单'
+        + (urgent ? '，其中 ' + urgent + ' 单待确认或待生产' : '') + '，按导入时间倒序';
     } else if (S.page === 'kilns') {
       const n = (S.kilns || []).length;
       $('#page-sub').textContent = n
@@ -205,12 +171,11 @@
     if (S.loading) return renderSkeleton(list);
     if (S.error) return renderError(list, S.error);
 
-    if (S.page === 'todo' || S.page === 'orders') {
+    if (S.page === 'orders') {
       if (!S.rows.length) return renderEmpty(list, S.keyword
         ? '没有找到「' + S.keyword + '」相关订单'
         : '还没有订单', S.keyword ? '换个关键词试试' : '导入一份 CSV 就能开始');
-      if (S.page === 'todo') renderGroups(list);
-      else renderFlat(list, S.rows);
+      renderFlat(list, S.rows);
     } else if (S.page === 'kilns') {
       if (!S.kilns || !S.kilns.length) {
         return renderEmpty(list, '还没有窑口', '导入订单后，会按商品名的第一段自动分出窑口');
@@ -317,30 +282,6 @@
     if (o.status === 'ready')     return { text: '去发货',    fn: x => setStatus(x, 'shipped') };
     if (o.status === 'shipped')   return { text: '标记完成',  fn: x => setStatus(x, 'done') };
     return null;
-  }
-
-  function renderGroups(list) {
-    S.groups.forEach(g => {
-      const grp = el('div', 'group');
-      const head = el('div', 'group-head');
-      head.appendChild(el('h2', null, g.label));
-      head.appendChild(el('span', 'cnt', g.rows.length + ' 单'));
-      if (g.hint) head.appendChild(el('span', 'hint', g.hint));
-      const more = el('button', 'more', '查看全部');
-      head.appendChild(more);
-      grp.appendChild(head);
-
-      const cols = el('div', 'cols');
-      cols.appendChild(el('span', null, '客户'));
-      cols.appendChild(el('span', null, '商品'));
-      const n = el('span', 'num', '数量'); cols.appendChild(n);
-      cols.appendChild(el('span', null, '状态'));
-      const a = el('span', 'act', '操作'); cols.appendChild(a);
-      grp.appendChild(cols);
-
-      g.rows.slice(0, 8).forEach(o => grp.appendChild(rowEl(o, g.key === 'confirm')));
-      list.appendChild(grp);
-    });
   }
 
   function renderFlat(list, rows) {
@@ -940,7 +881,7 @@
     bindChrome();
     bindKeys();
     const hash = (location.hash || '').replace('#', '');
-    S.page = PAGE_META[hash] ? hash : 'todo';
+    S.page = PAGE_META[hash] ? hash : 'orders';
     load(S.page);
     waitBridge(40);   // pywebviewready 不保证触发，自己轮询更可靠
   }
