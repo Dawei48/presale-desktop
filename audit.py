@@ -1,9 +1,7 @@
 """audit.py — 多维度自审。不启动 GUI，跑完给出 PASS/FAIL 清单。"""
-import io
 import os
 import sys
 import json
-import glob
 import tempfile
 import traceback
 
@@ -64,6 +62,22 @@ def dim_static():
             continue
         p = os.path.join(base, "web", m)
         rec("静态", f"资源存在 {m}", os.path.exists(p), p)
+
+    # ── 桥接回归：这个 bug 骗过一次「界面正常」，必须焊死 ──
+    import re as _re
+    api_js = open(os.path.join(base, "web", "js", "api.js"), encoding="utf-8").read()
+    # 剥掉注释再判断，否则注释里那句「不能写成 Promise.race」会自己触发误报
+    api_code = _re.sub(r"/\*.*?\*/", "", api_js, flags=_re.S)
+    api_code = _re.sub(r"^\s*//.*$", "", api_code, flags=_re.M)
+    rec("桥接", "没有用 Promise.race 包 pywebview 返回值",
+        "Promise.race" not in api_code,
+        "pywebview 的 api 返回自定义 thenable，塞进 race 会永不 settle，"
+        "界面就永远停在 mock 假数据上还显示「已同步」")
+    rec("桥接", "有超时兜底", "setTimeout" in api_js and "超时" in api_js, "缺超时保护")
+    rec("桥接", "有 pywebview 调试出口",
+        "window.__app" in open(os.path.join(base, "web", "js", "app.js"),
+                               encoding="utf-8").read(),
+        "没有 __app 出口就无法从外部验证页面真实状态")
 
     # app.js 里没有残留的已删页面引用
     js = open(os.path.join(base, "web", "js", "app.js"), encoding="utf-8").read()
@@ -198,7 +212,7 @@ def dim_io():
     # 导出
     out = os.path.join(tempfile.gettempdir(), "audit_slip.docx")
     presale = [r for r in rows if r["status"] in ("confirm", "producing")]
-    n = export_production_docx("玉柏", presale, out)
+    export_production_docx("玉柏", presale, out)
     rec("导出", "文件生成", os.path.exists(out) and os.path.getsize(out) > 5000,
         str(os.path.getsize(out) if os.path.exists(out) else 0))
 
@@ -234,8 +248,14 @@ def dim_packaging():
     logo_js = open(os.path.join(base, "web", "js", "logo.js"), encoding="utf-8").read()
     rec("打包", "logo base64 已内嵌", "data:image/png;base64," in logo_js, "")
 
-    from config import USE_CLOUD
-    rec("打包", "本地模式", USE_CLOUD is False, f"USE_CLOUD={USE_CLOUD}")
+    # 纯本地：不应该再有云端模块或凭据
+    from config import DATA_DIR
+    rec("打包", "数据目录可写", os.path.isdir(DATA_DIR), DATA_DIR)
+    rec("打包", "无云端模块残留",
+        not os.path.exists(os.path.join(base, "database_cloud.py")), "database_cloud.py 还在")
+    cfg = open(os.path.join(base, "config.py"), encoding="utf-8").read()
+    rec("打包", "config 无凭据", "sb_publishable" not in cfg and "SUPABASE_KEY" not in cfg,
+        "config.py 里还有 Supabase 凭据")
 
 
 def main():

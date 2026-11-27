@@ -28,6 +28,7 @@
     groups: [],
     sel: -1,          // 键盘选中行
     loading: false,
+    loadSeq: 0,
     error: null,
     theme: 'dark',
     settings: {},
@@ -85,55 +86,50 @@
   /* ── 数据加载 ──────────────────────────────────────────────── */
   async function load(page) {
     page = page || S.page;
+    // 快速切页时，先发出去的请求可能后回来，拿旧数据糊掉当前页。
+    // 每次 load 领一个序号，回来时对不上就直接丢弃。
+    const seq = ++S.loadSeq;
     S.loading = true;
     S.error = null;
     render();
 
     if (page === 'orders') {
       const r = await API.orders(S.filter, S.keyword);
+      if (seq !== S.loadSeq) return;
       S.loading = false;
       if (!r.ok) { S.error = r.error; S.rows = []; }
       else { S.rows = r.data.rows || []; S.counts = r.data.counts || {}; }
       render();
     } else if (page === 'kilns') {
       const r = await API.kilns();
+      if (seq !== S.loadSeq) return;
       S.loading = false;
       if (!r.ok) { S.error = r.error; S.kilns = []; }
       else S.kilns = r.data || [];
       render();
     } else if (page === 'products') {
-      const r = await API.products('');
+      const r = await API.products();
+      if (seq !== S.loadSeq) return;
       S.loading = false;
       if (!r.ok) { S.error = r.error; S.rows = []; }
       else S.rows = r.data || [];
       render();
     } else if (page === 'imports') {
       const r = await API.imports();
+      if (seq !== S.loadSeq) return;
       S.loading = false;
       if (!r.ok) { S.error = r.error; S.rows = []; }
       else S.rows = r.data || [];
       render();
     } else if (page === 'settings') {
       const r = await API.getSettings();
+      if (seq !== S.loadSeq) return;
       S.loading = false;
       if (r.ok) S.settings = r.data || {};
       render();
     }
     refreshNav();
     updateSub();
-  }
-
-  function buildProduction() {
-    // 生产单：按窑口聚合
-    const map = {};
-    S.rows.forEach(o => {
-      const kiln = o.kiln || (o.goods_name ? String(o.goods_name).split('·')[0].trim() : '未标注窑口');
-      (map[kiln] = map[kiln] || []).push(o);
-    });
-    S.kilns = Object.keys(map).sort().map(k => ({
-      key: k, label: k, rows: map[k],
-      qty: map[k].reduce((a, o) => a + (o.quantity || 1), 0),
-    }));
   }
 
   function refreshNav() {
@@ -328,12 +324,6 @@
 
       list.appendChild(grp);
     });
-  }
-
-  function fileUrl(p) {
-    if (!p) return '';
-    if (/^https?:/i.test(p)) return p;
-    return 'file:///' + String(p).replace(/\\/g, '/').replace(/^\/+/, '');
   }
 
   function renderProducts(list) {
@@ -603,7 +593,7 @@
     // 商品名补全：把商品库已有的名字喂给 datalist，少打字也少打错
     let names = [];
     try {
-      const pr = await API.products('');
+      const pr = await API.products();
       if (pr.ok && Array.isArray(pr.data)) {
         names = pr.data.map(p => p.name).filter(Boolean).slice(0, 200);
       }
@@ -912,4 +902,7 @@
 
   // pywebview 注入较晚：桥接可用后重载一次数据
   document.addEventListener('pywebviewready', () => load(S.page));
+
+  // 调试出口：本地桌面应用不会被外部脚本注入，暴露给 DevTools 用于排查和自动化测试
+  window.__app = { S, API, go, load, render };
 })();

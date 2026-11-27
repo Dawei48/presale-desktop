@@ -4,7 +4,6 @@
 """
 import sqlite3
 import hashlib
-import os
 from datetime import datetime
 from contextlib import contextmanager
 from config import DB_PATH
@@ -317,7 +316,10 @@ class Database:
 
     def add_order(self, product_id, quantity=1, order_no="", customer="", notes="", created_at=None, ship_days=30,
                   order_type="normal", goods_name="", spec="",
-                  receiver_name="", receiver_phone="", receiver_addr="", amount=0, shop_type=""):
+                  receiver_name="", receiver_phone="", receiver_addr="", amount=0, shop_type="",
+                  status=None):
+        """status 可选：导入时按订单类型直接给初始状态，避免插入后再 UPDATE 一次
+        （那一步失败会被静默吞掉，预售单就悄悄留在「待发货」了）。"""
         with self._conn() as conn:
             fields = ["product_id", "order_no", "customer", "quantity", "notes",
                       "ship_days", "order_type", "goods_name", "spec",
@@ -325,6 +327,9 @@ class Database:
             values = [product_id, order_no, customer, quantity, notes,
                       ship_days, order_type, goods_name, spec,
                       receiver_name, receiver_phone, receiver_addr, amount, shop_type]
+            if status:
+                fields.append("status")
+                values.append(status)
             if created_at:
                 fields.append("created_at")
                 values.append(created_at)

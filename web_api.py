@@ -4,11 +4,8 @@ web_api.py — pywebview JS 桥接层
 约定：所有方法返回 {"ok": True, "data": ...} 或 {"ok": False, "error": str}
 前端 api.js 只认这两种形状。异常绝不外泄到 JS（否则 UI 卡死无提示）。
 """
-import os
-import sys
 import json
-import traceback
-import subprocess
+import os
 from datetime import datetime
 
 import webview
@@ -302,7 +299,7 @@ class WebApi:
         except Exception as e:
             return _err(e)
 
-    def products(self, keyword=""):
+    def products(self):
         try:
             rows = self.db.get_products()
             seen = {}

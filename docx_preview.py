@@ -8,7 +8,6 @@ docx_preview.py — 把 .docx 渲染成 HTML（仅用于自检看排版，不是
 import os
 import sys
 import base64
-import zipfile
 
 from docx import Document
 from docx.oxml.ns import qn

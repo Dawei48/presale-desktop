@@ -1,10 +1,6 @@
-# 新版界面（main_web.py）
 pywebview>=5.0
 python-docx>=1.1.0
 Pillow>=10.0.0
 
-# 旧版界面（main.py，已不再维护，保留仅供参考）
-customtkinter>=5.2.0
-
-# 云端模式（默认关闭，USE_CLOUD=False 时不需要）
-supabase>=2.0.0
+# 开发自检
+ruff>=0.15

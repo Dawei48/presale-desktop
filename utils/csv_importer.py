@@ -12,7 +12,6 @@ pywebview 版不能碰它。这里是同一套规则的纯函数版本。
 · 商品不存在时自动建到「未分类」品牌下
 """
 import csv
-import os
 from datetime import datetime
 
 FIELD_PATTERNS = {
@@ -27,9 +26,6 @@ FIELD_PATTERNS = {
     "receiver_addr": ["收货地址", "详细地址", "地址", "address", "addr"],
     "amount":        ["实付金额", "订单金额", "商品金额", "应付金额", "实付", "金额", "amount"],
 }
-
-PLATFORM_DAYS = {"douyin": 2, "taobao": 3, "pdd": 3, "unknown": 30}
-
 
 def _read_rows(path):
     for enc in ("utf-8-sig", "utf-8", "gbk", "gb2312", "gb18030"):
@@ -192,14 +188,13 @@ def import_csv_file(db, path, use_ai=True):
         otype = detect_order_type(notes)
         # 初始状态跟着类型走：预售要先跟客户确认延发，预存直接挂账，现货等发货
         init_status = {"presale": "confirm", "stored": "stored", "normal": "ready"}[otype]
-        new_id = db.add_order(
+        db.add_order(
             product_id=pid,
             quantity=qty,
             order_no=order_no,
             customer=_get(row, idx["customer"]),
             notes=notes,
             created_at=_norm_date(_get(row, idx["created_at"])),
-            ship_days=PLATFORM_DAYS["unknown"],
             order_type=otype,
             goods_name=goods,
             spec=_get(row, idx["spec"]),
@@ -207,11 +202,8 @@ def import_csv_file(db, path, use_ai=True):
             receiver_phone=_get(row, idx["receiver_phone"]),
             receiver_addr=_get(row, idx["receiver_addr"]),
             amount=_amount(_get(row, idx["amount"])),
+            status=init_status,
         )
-        try:
-            db.update_order(new_id, status=init_status)
-        except Exception:
-            pass
         added += 1
 
     return {"added": added, "dup": dup, "invalid": invalid,
