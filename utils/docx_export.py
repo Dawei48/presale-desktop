@@ -1,18 +1,19 @@
 """
-Word 导出 - 仅导出未发货订单
-格式: 产品图片 | 产品名 | 价格 | 预售数量
-按产品合并，压缩图片
+Word 导出 - 预售生产单
+只导出「预售 + 未发货」订单，按 工艺|画片|器型|窑口 合并
+无法识别的商品名归「待确认」组单独列出
 """
 import os
 import io
 from datetime import datetime
 from docx import Document
-from docx.shared import Pt, Cm, RGBColor, Emu
+from docx.shared import Pt, Cm, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml.ns import nsdecls
 from docx.oxml import parse_xml
 from PIL import Image as PILImage
+from utils.goods_parser import parse_goods_name, merge_key
 
 
 def compress_image(img_path, max_size=(300, 300), quality=60):
@@ -38,14 +39,46 @@ def compress_image(img_path, max_size=(300, 300), quality=60):
 
 
 def export_brand_orders_docx(brand_name, orders, filepath, title=None):
-    """导出未发货订单 - 按产品合并"""
-    # 只取未发货订单
-    pending = [o for o in orders if o.get("status") == "pending"]
-    if not pending:
-        pending = orders  # 如果没有筛选到，就用全部（兜底）
+    """导出预售生产单 - 只导「预售 + 未发货」，按词表拆解合并"""
+    # 只取预售且未发货订单
+    presale = [o for o in orders if o.get("order_type") == "presale" and o.get("status") == "pending"]
+    if not presale:
+        presale = [o for o in orders if o.get("status") == "pending"]  # 兼容旧数据
 
     if title is None:
-        title = f"{brand_name} - 预售订单"
+        title = f"{brand_name} - 预售生产单"
+
+    # 词表拆解 + 合并
+    item_map = {}
+    unknown = []
+    for o in presale:
+        parsed = parse_goods_name(o.get("goods_name") or o.get("product_name") or "")
+        display = " ".join(x for x in [parsed["窑口"], parsed["工艺"], parsed["画片"], parsed["器型"]] if x)
+        # 完全无法识别（工艺/画片/器型全空）→ 待确认
+        if not parsed["工艺"] and not parsed["画片"] and not parsed["器型"]:
+            unknown.append({
+                "name": o.get("goods_name") or o.get("product_name") or "未知商品",
+                "qty": o.get("quantity", 0),
+            })
+            continue
+        key = merge_key(parsed)
+        if key not in item_map:
+            item_map[key] = {
+                "display": display,
+                "image_path": o.get("product_image_path", ""),
+                "total_qty": 0,
+                "notes": [],
+            }
+        item_map[key]["total_qty"] += o.get("quantity", 0)
+        note = o.get("notes", "")
+        if note and note not in item_map[key]["notes"]:
+            item_map[key]["notes"].append(note)
+
+    if not item_map and not unknown:
+        doc = Document()
+        doc.add_paragraph("暂无预售订单")
+        doc.save(filepath)
+        return filepath
 
     doc = Document()
     section = doc.sections[0]
@@ -57,7 +90,6 @@ def export_brand_orders_docx(brand_name, orders, filepath, title=None):
     section.right_margin = Cm(2)
 
     # Logo + 标题
-    from config import BASE_DIR
     from config import _find_resource
     logo_path = _find_resource("assets/logo.png")
     if os.path.exists(logo_path):
@@ -81,114 +113,94 @@ def export_brand_orders_docx(brand_name, orders, filepath, title=None):
 
     doc.add_paragraph()
 
-    # 按产品合并: 同一产品多笔订单 → 一行
-    product_map = {}
-    for o in pending:
-        pname = o.get("product_name", "未知")
-        if pname not in product_map:
-            product_map[pname] = {
-                "price": o.get("product_price", 0),
-                "image_path": o.get("product_image_path", ""),
-                "total_qty": 0,
-                "orders": [],
-                "dates": [],
-            }
-        product_map[pname]["total_qty"] += o.get("quantity", 0)
-        product_map[pname]["orders"].append(o)
-        date_str = o.get("created_at", "")[:10]
-        if date_str and date_str not in product_map[pname]["dates"]:
-            product_map[pname]["dates"].append(date_str)
+    # 主表: 图片 | 产品名称 | 数量 | 备注
+    headers = ["产品图片", "产品名称", "数量", "备注"]
+    rows_count = len(item_map) + (1 if unknown else 0)
+    if item_map:
+        table = doc.add_table(rows=1 + len(item_map), cols=len(headers))
+        table.alignment = WD_TABLE_ALIGNMENT.CENTER
+        table.style = "Table Grid"
+        for row in table.rows:
+            row.cells[0].width = Cm(2.5)
+            row.cells[1].width = Cm(7)
+            row.cells[2].width = Cm(2)
+            row.cells[3].width = Cm(6)
 
-    if not product_map:
-        doc.add_paragraph("暂无未发货订单")
-        doc.save(filepath)
-        return filepath
+        # 表头
+        for i, h in enumerate(headers):
+            cell = table.rows[0].cells[i]
+            cell.text = h
+            for par in cell.paragraphs:
+                par.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                for run in par.runs:
+                    run.font.size = Pt(10)
+                    run.font.bold = True
+                    run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+            shading = parse_xml(f'<w:shd {nsdecls("w")} w:fill="0F172A"/>')
+            cell._tc.get_or_add_tcPr().append(shading)
 
-    # 表格: 图片 | 产品名称 | 价格 | 预售数量 | 预售日期
-    headers = ["产品图片", "产品名称", "价格", "预售数量", "预售日期"]
-    table = doc.add_table(rows=1 + len(product_map), cols=len(headers))
-    table.alignment = WD_TABLE_ALIGNMENT.CENTER
-    table.style = "Table Grid"
+        # 数据行
+        for ri, data in enumerate(item_map.values()):
+            row = table.rows[ri + 1]
+            row.height = Cm(2.5)
 
-    # 设置列宽
-    for row in table.rows:
-        row.cells[0].width = Cm(2.5)
-        row.cells[1].width = Cm(4)
-        row.cells[2].width = Cm(2)
-        row.cells[3].width = Cm(2)
-        row.cells[4].width = Cm(5)
+            # 图片
+            cell_img = row.cells[0]
+            cell_img.paragraphs[0].clear()
+            img_path = data.get("image_path", "")
+            has_img = img_path and (img_path.startswith("http") or os.path.exists(img_path))
+            if has_img:
+                buf = compress_image(img_path, max_size=(200, 200), quality=50)
+                if buf:
+                    p = cell_img.paragraphs[0]
+                    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    run = p.add_run()
+                    run.add_picture(buf, width=Cm(2.2))
 
-    # 表头
-    for i, h in enumerate(headers):
-        cell = table.rows[0].cells[i]
-        cell.text = h
-        for par in cell.paragraphs:
-            par.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            for run in par.runs:
-                run.font.size = Pt(10)
-                run.font.bold = True
-                run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
-        shading = parse_xml(f'<w:shd {nsdecls("w")} w:fill="0F172A"/>')
-        cell._tc.get_or_add_tcPr().append(shading)
+            # 名称
+            cell_name = row.cells[1]
+            cell_name.text = data["display"]
+            for par in cell_name.paragraphs:
+                par.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                for run in par.runs:
+                    run.font.size = Pt(11)
+                    run.font.bold = True
 
-    # 数据行
-    for ri, (pname, pdata) in enumerate(product_map.items()):
-        row = table.rows[ri + 1]
-        row.height = Cm(2.5)
+            # 数量
+            cell_qty = row.cells[2]
+            cell_qty.text = str(data["total_qty"])
+            for par in cell_qty.paragraphs:
+                par.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                for run in par.runs:
+                    run.font.size = Pt(11)
+                    run.font.bold = True
 
-        # 图片列
-        cell_img = row.cells[0]
-        cell_img.paragraphs[0].clear()
-        img_path = pdata.get("image_path", "")
-        has_img = img_path and (img_path.startswith("http") or os.path.exists(img_path))
-        if has_img:
-            buf = compress_image(img_path, max_size=(200, 200), quality=50)
-            if buf:
-                p = cell_img.paragraphs[0]
-                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                run = p.add_run()
-                run.add_picture(buf, width=Cm(2.2))
+            # 备注
+            cell_notes = row.cells[3]
+            cell_notes.text = "、".join(data["notes"]) if data["notes"] else "-"
+            for par in cell_notes.paragraphs:
+                par.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                for run in par.runs:
+                    run.font.size = Pt(9)
 
-        # 产品名
-        cell_name = row.cells[1]
-        cell_name.text = pname
-        for par in cell_name.paragraphs:
-            par.alignment = WD_ALIGN_PARAGRAPH.LEFT
-            for run in par.runs:
-                run.font.size = Pt(11)
-                run.font.bold = True
+            # 斑马纹
+            if ri % 2 == 0:
+                for ci in range(len(headers)):
+                    shading = parse_xml(f'<w:shd {nsdecls("w")} w:fill="F8FAFC"/>')
+                    row.cells[ci]._tc.get_or_add_tcPr().append(shading)
 
-        # 价格
-        cell_price = row.cells[2]
-        cell_price.text = f"¥{pdata['price']:,.0f}"
-        for par in cell_price.paragraphs:
-            par.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            for run in par.runs:
-                run.font.size = Pt(11)
-
-        # 预售数量
-        cell_qty = row.cells[3]
-        cell_qty.text = str(pdata["total_qty"])
-        for par in cell_qty.paragraphs:
-            par.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            for run in par.runs:
-                run.font.size = Pt(11)
-                run.font.bold = True
-
-        # 预售日期（所有订单日期，逗号分隔）
-        cell_dates = row.cells[4]
-        dates = pdata.get("dates", [])
-        cell_dates.text = "、".join(dates) if dates else "-"
-        for par in cell_dates.paragraphs:
-            par.alignment = WD_ALIGN_PARAGRAPH.LEFT
-            for run in par.runs:
-                run.font.size = Pt(9)
-
-        # 斑马纹
-        if ri % 2 == 0:
-            for ci in range(len(headers)):
-                shading = parse_xml(f'<w:shd {nsdecls("w")} w:fill="F8FAFC"/>')
-                row.cells[ci]._tc.get_or_add_tcPr().append(shading)
+    # 待确认组
+    if unknown:
+        doc.add_paragraph()
+        p = doc.add_paragraph()
+        run = p.add_run("⚠️ 待人工确认（商品名无法自动识别，请手动补画片/器型）")
+        run.font.size = Pt(11)
+        run.font.bold = True
+        run.font.color.rgb = RGBColor(0xC9, 0x8A, 0x2E)
+        for u in unknown:
+            p = doc.add_paragraph()
+            run = p.add_run(f"• {u['name']}  ×{u['qty']}")
+            run.font.size = Pt(10)
 
     # 页脚
     doc.add_paragraph()

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>放心预 · 按钮设计精修</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#08090a; --panel:#0f1011; --surface:#191a1b;
+    --card:rgba(255,255,255,0.03);
+    --text:#f7f8f8; --text-2:#d0d6e0; --text-3:#8a8f98; --text-4:#62666d;
+    --accent:#5e6ad2; --accent-hover:#828fff; --accent-active:#4f5ab8;
+    --border:rgba(255,255,255,0.08); --border-subtle:rgba(255,255,255,0.06);
+    --green:#10b981; --amber:#f59e0b;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{
+    font-family:'Inter','Microsoft YaHei',system-ui,sans-serif;
+    background:var(--bg); color:var(--text);
+    padding:48px; -webkit-font-smoothing:antialiased;
+  }
+  h1{font-size:18px;font-weight:600;letter-spacing:-.3px;margin-bottom:4px;}
+  .sub{font-size:12px;color:var(--text-4);margin-bottom:36px;}
+  .group{margin-bottom:36px;}
+  .group-title{font-size:12px;font-weight:500;color:var(--text-3);margin-bottom:14px;letter-spacing:.3px;}
+  .row{display:flex;align-items:center;gap:20px;margin-bottom:10px;}
+  .state-label{font-size:11px;color:var(--text-4);width:48px;flex-shrink:0;}
+
+  /* 按钮基础 */
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:6px;font-size:12.5px;font-weight:500;cursor:pointer;border:1px solid transparent;transition:background .12s ease,color .12s ease,transform .05s ease,border-color .12s ease;user-select:none;}
+
+  /* 主按钮 */
+  .btn-primary{background:var(--accent);color:#fff;}
+  .btn-primary:hover{background:var(--accent-hover);}
+  .btn-primary:active{background:var(--accent-active);transform:translateY(.5px);}
+
+  /* 次要按钮（ghost）*/
+  .btn-ghost{background:rgba(255,255,255,0.02);border-color:rgba(255,255,255,0.06);color:var(--text-2);}
+  .btn-ghost:hover{background:rgba(255,255,255,0.045);color:var(--text);}
+  .btn-ghost:active{background:rgba(255,255,255,0.025);transform:translateY(.5px);}
+
+  /* 图标按钮 */
+  .btn-icon{width:28px;height:28px;padding:0;border-radius:6px;background:rgba(255,255,255,0.02);border-color:rgba(255,255,255,0.06);color:var(--text-3);justify-content:center;font-size:14px;}
+  .btn-icon:hover{background:rgba(255,255,255,0.05);color:var(--text);}
+
+  /* 筛选 pill */
+  .pill{padding:4px 11px;border-radius:6px;font-size:12px;color:var(--text-3);cursor:pointer;border:1px solid transparent;transition:all .12s ease;}
+  .pill:hover{color:var(--text);}
+  .pill.active{background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.08);color:var(--text);}
+
+  /* 危险按钮 */
+  .btn-danger{background:rgba(248,113,113,0.1);border-color:rgba(248,113,113,0.3);color:#fca5a5;}
+  .btn-danger:hover{background:rgba(248,113,113,0.16);color:#fecaca;}
+
+  /* 静态状态模拟 */
+  .is-hover{background:var(--accent-hover) !important;}
+  .is-active{background:var(--accent-active) !important;transform:translateY(.5px);}
+  .ghost-hover{background:rgba(255,255,255,0.045) !important;color:var(--text) !important;}
+  .ghost-active{background:rgba(255,255,255,0.025) !important;transform:translateY(.5px);}
+  .pill-hover{color:var(--text) !important;}
+</style>
+</head>
+<body>
+  <h1>按钮 & 交互状态</h1>
+  <div class="sub">Linear 风格 · 半透明白底 + 细描边 · 点击有按压反馈</div>
+
+  <!-- 主按钮 -->
+  <div class="group">
+    <div class="group-title">主按钮（唯一实心色，用于"导出生产单"这类关键动作）</div>
+    <div class="row"><span class="state-label">默认</span><span class="btn btn-primary">导出生产单</span></div>
+    <div class="row"><span class="state-label">悬停</span><span class="btn btn-primary is-hover">导出生产单</span></div>
+    <div class="row"><span class="state-label">按下</span><span class="btn btn-primary is-active">导出生产单</span></div>
+  </div>
+
+  <!-- 次要按钮 -->
+  <div class="group">
+    <div class="group-title">次要按钮（导入、取消、返回等，几乎透明）</div>
+    <div class="row"><span class="state-label">默认</span><span class="btn btn-ghost">⇪ 导入CSV</span><span class="btn btn-ghost">取消</span></div>
+    <div class="row"><span class="state-label">悬停</span><span class="btn btn-ghost ghost-hover">⇪ 导入CSV</span></div>
+    <div class="row"><span class="state-label">按下</span><span class="btn btn-ghost ghost-active">⇪ 导入CSV</span></div>
+  </div>
+
+  <!-- 图标按钮 -->
+  <div class="group">
+    <div class="group-title">图标按钮（编辑 ✎ / 删除 ✕）</div>
+    <div class="row"><span class="state-label">默认</span><span class="btn btn-icon">✎</span><span class="btn btn-icon">✕</span><span class="btn btn-icon">⋯</span></div>
+  </div>
+
+  <!-- 筛选 pill -->
+  <div class="group">
+    <div class="group-title">筛选 tab（订单类型切换）</div>
+    <div class="row">
+      <span class="state-label">默认</span>
+      <span class="pill active">全部</span><span class="pill">现货</span><span class="pill">预售</span><span class="pill">预存</span>
+    </div>
+    <div class="row">
+      <span class="state-label">悬停</span>
+      <span class="pill active">全部</span><span class="pill pill-hover">现货</span><span class="pill">预售</span><span class="pill">预存</span>
+    </div>
+  </div>
+
+  <!-- 危险按钮 -->
+  <div class="group">
+    <div class="group-title">危险按钮（删除订单）</div>
+    <div class="row"><span class="state-label">默认</span><span class="btn btn-danger">删除订单</span></div>
+  </div>
+</body>
+</html>

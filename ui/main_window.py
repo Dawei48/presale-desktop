@@ -169,21 +169,21 @@ class MainWindow(ctk.CTkFrame):
             b = brand_map.get(name)
             if not b:
                 return
-            orders = self.db.get_orders(brand_id=b["id"], status="pending")
-            if not orders:
-                messagebox.showinfo("提示", f"品牌「{name}」暂无未发货订单", parent=dialog)
+            orders = self.db.get_orders(brand_id=b["id"])
+            presale = [o for o in orders if o.get("order_type") == "presale" and o.get("status") == "pending"]
+            if not presale:
+                messagebox.showinfo("提示", f"品牌「{name}」暂无预售订单", parent=dialog)
                 return
             filepath = filedialog.asksaveasfilename(
                 parent=dialog, defaultextension=".docx",
                 filetypes=[("Word 文档", "*.docx")],
-                initialfile=f"{name}_预售订单_{__import__('datetime').datetime.now().strftime('%Y%m%d')}.docx")
+                initialfile=f"{name}_预售生产单_{__import__('datetime').datetime.now().strftime('%Y%m%d')}.docx")
             if filepath:
                 export_brand_orders_docx(name, orders, filepath)
                 dialog.destroy()
-                # 统计产品数
-                from collections import Counter
-                product_count = len(set(o.get("product_name", "") for o in orders))
-                if messagebox.askyesno("导出成功", f"已导出 {product_count} 个产品（未发货）到:\n{filepath}\n\n是否打开？"):
+                # 统计产品数（按商品+规格去重）
+                product_count = len(set((o.get("goods_name") or o.get("product_name"), o.get("spec")) for o in presale))
+                if messagebox.askyesno("导出成功", f"已导出 {product_count} 个产品（预售）到:\n{filepath}\n\n是否打开？"):
                     import os
                     os.startfile(filepath)
 

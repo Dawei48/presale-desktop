@@ -1,60 +1,60 @@
 """
 UI 主题 & 样式常量
-「青花瓷」主题 —— 景德镇陶瓷 × 现代工具
-暖灰中性 + 青花钴蓝主色 + 釉色语义色
-设计依据：ui-ux-pro-max skill（配色 token 化、字号 ≥12px、4/8 间距节奏、暖灰中性）
+「暗色 Linear 风格」—— 近黑背景 + 灰阶文字 + 单一靛蓝主色
+设计依据：Linear / Midday 设计系统（popular-web-designs 模板）
+配色哲学：几乎全灰阶 + 一个主色，不用花哨语义色
 """
 import customtkinter as ctk
 
 # ── 主题设置 ──────────────────────────────────
-ctk.set_appearance_mode("light")
-ctk.set_default_color_theme("blue")
+ctk.set_appearance_mode("dark")
+ctk.set_default_color_theme("dark-blue")
 
 # ── 配色板 ────────────────────────────────────
 class Colors:
-    # 主色（青花钴蓝）
-    PRIMARY       = "#2D5AA8"
-    PRIMARY_HOVER = "#23478A"
-    PRIMARY_LIGHT = "#EDF3FB"
-    PRIMARY_DIM   = "#DCE8F7"
+    # 主色（正蓝，唯一饱和色，克制使用）
+    PRIMARY       = "#3b82f6"
+    PRIMARY_HOVER = "#60a5fa"
+    PRIMARY_LIGHT = "#14223a"   # 暗蓝底（次要蓝系元素背景）
+    PRIMARY_DIM   = "#1a2c4a"   # 稍亮暗蓝（hover）
 
-    # 语义色（陶瓷釉色）
-    SUCCESS       = "#1F9D6E"   # 青釉绿
-    SUCCESS_LIGHT = "#E2F5EC"
-    SUCCESS_HOVER = "#177A55"
-    WARNING       = "#C98A2E"   # 窑变黄
-    WARNING_LIGHT = "#F8EFDD"
-    WARNING_HOVER = "#A97024"
-    DANGER        = "#D9544D"   # 朱砂红
-    DANGER_LIGHT  = "#FBE8E6"
-    DANGER_HOVER  = "#B93F38"
-    DANGER_LIGHT_HOVER = "#F5D7D4"
-    INFO          = "#4F6FA8"   # 靛青
-    INFO_LIGHT    = "#E7EDF7"
+    # 语义色（暗色适配）
+    SUCCESS       = "#10b981"   # 绿
+    SUCCESS_LIGHT = "#0d2a1f"
+    SUCCESS_HOVER = "#34d399"
+    WARNING       = "#f59e0b"   # 琥珀（预存提示）
+    WARNING_LIGHT = "#2a1f0d"
+    WARNING_HOVER = "#fbbf24"
+    DANGER        = "#f87171"   # 红
+    DANGER_LIGHT  = "#2a1515"
+    DANGER_HOVER  = "#fca5a5"
+    DANGER_LIGHT_HOVER = "#3a1c1c"
+    INFO          = "#60a5fa"   # 亮蓝
+    INFO_LIGHT    = "#14223a"
 
-    # 侧边栏（深青花藏青）
-    SIDEBAR_BG      = "#1B2A44"
-    SIDEBAR_HOVER   = "#243654"
-    SIDEBAR_ACTIVE  = "#2D5AA8"
-    SIDEBAR_TEXT    = "#A8B6CE"
-    SIDEBAR_TEXT_HI = "#F5F7FA"
+    # 侧边栏
+    SIDEBAR_BG      = "#0f1011"
+    SIDEBAR_HOVER   = "#1a1b1d"
+    SIDEBAR_ACTIVE  = "#232528"
+    SIDEBAR_TEXT    = "#8a8f98"
+    SIDEBAR_TEXT_HI = "#f7f8f8"
 
-    # 背景（暖灰，呼应陶土质感）
-    BG_MAIN   = "#F7F5F1"
-    BG_CARD   = "#FFFFFF"
-    BG_INPUT  = "#F3F1EC"
-    BG_HOVER  = "#F0EEE9"
+    # 背景（层级从深到浅）
+    BG_MAIN   = "#08090a"   # 页面最深
+    BG_CARD   = "#0f1011"   # 卡片/面板/侧边栏
+    BG_INPUT  = "#1a1b1d"   # 输入框/次级
+    BG_HOVER  = "#232528"   # 悬停
 
-    # 文字（暖黑 / 暖灰）
-    TEXT_PRIMARY   = "#2B2A26"
-    TEXT_SECONDARY = "#5C5A54"
-    TEXT_MUTED     = "#9A968E"
-    TEXT_WHITE     = "#FFFFFF"
+    # 文字（从亮到暗）
+    TEXT_PRIMARY   = "#f7f8f8"
+    TEXT_SECONDARY = "#d0d6e0"
+    TEXT_MUTED     = "#8a8f98"
+    TEXT_WHITE     = "#ffffff"
 
-    # 边框（暖灰）
-    BORDER       = "#E4E1DA"
-    BORDER_FOCUS = "#2D5AA8"
-    BORDER_LIGHT = "#F0EEE9"
+    # 边框
+    BORDER       = "#232528"
+    BORDER_FOCUS = "#3b82f6"
+    BORDER_LIGHT = "#1a1b1d"
 
 # ── 字体 ──────────────────────────────────────
 class Fonts:

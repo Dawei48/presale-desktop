@@ -33,6 +33,15 @@ def _ship_status(order):
     return f"剩 {remain} 天", Colors.TEXT_MUTED
 
 
+# ── 订单类型徽章 ──────────────────────────────
+ORDER_TYPE_MAP = {
+    "normal":   ("现货", Colors.TEXT_MUTED, Colors.BG_HOVER),
+    "presale":  ("预售", Colors.PRIMARY, Colors.PRIMARY_LIGHT),
+    "stored":   ("预存", Colors.WARNING, Colors.WARNING_LIGHT),
+}
+ORDER_TYPE_CYCLE = ["normal", "presale", "stored"]
+
+
 class DatePicker(ctk.CTkFrame):
     """简易日期选择器"""
     def __init__(self, parent, initial=None, **kw):
@@ -374,8 +383,8 @@ class OrdersTab(ctk.CTkFrame):
         table.pack(fill="x")
 
         # 列定义: (标题, 宽度)
-        cols = [("订单号", 120), ("客户", 80), ("产品", 120), ("数量", 50),
-                ("状态", 180), ("备注", 90), ("日期/发货", 110), ("", 80)]
+        cols = [("订单号", 105), ("类型", 52), ("客户", 65), ("商品", 130), ("数量", 40),
+                ("金额", 68), ("状态", 150), ("备注", 70), ("日期", 80), ("", 60)]
 
         # 表头
         hdr = ctk.CTkFrame(table, fg_color=Colors.SIDEBAR_BG, corner_radius=Radius.MD, height=38)
@@ -393,52 +402,80 @@ class OrdersTab(ctk.CTkFrame):
             row.pack(fill="x", pady=1)
             row.pack_propagate(False)
 
-            vals = [
-                order.get("order_no", ""),
-                order.get("customer", ""),
-                order.get("product_name", ""),
-                str(order.get("quantity", 0)),
-                STATUS_MAP.get(order.get("status", "pending"), ("未知", "", ""))[0],
-                order.get("notes", ""),
-                order.get("created_at", "")[:10],
-            ]
-            widths = [120, 80, 120, 50, 180, 90, 110, 80]
+            otype = order.get("order_type", "normal")
 
-            for i, v in enumerate(vals):
-                if i == 4:
-                    # 状态列: 4个快捷按钮
-                    sf = ctk.CTkFrame(row, fg_color="transparent")
-                    sf.grid(row=0, column=i, sticky="w", padx=Spacing.SM)
-                    for skey, (slabel, sfg, sbg) in STATUS_MAP.items():
-                        is_active = (skey == order.get("status", "pending"))
-                        ctk.CTkButton(sf, text=slabel, font=Fonts.TINY, width=40, height=22,
-                                      fg_color=sfg if is_active else "transparent",
-                                      text_color="white" if is_active else sfg,
-                                      hover_color=sfg,
-                                      border_width=0 if is_active else 1,
-                                      border_color=sfg,
-                                      corner_radius=Radius.SM,
-                                      command=lambda o=order, sk=skey: self._set_status(o, sk)).pack(
-                            side="left", padx=1)
-                elif i == 6:
-                    # 日期/发货列：日期 + 发货倒计时
-                    df = ctk.CTkFrame(row, fg_color="transparent")
-                    df.grid(row=0, column=i, sticky="w", padx=Spacing.SM)
-                    ctk.CTkLabel(df, text=v, font=Fonts.SMALL,
-                                 text_color=Colors.TEXT_PRIMARY, anchor="w").pack(anchor="w")
-                    ship = _ship_status(order)
-                    if ship:
-                        ctk.CTkLabel(df, text=ship[0], font=Fonts.TINY,
-                                     text_color=ship[1], anchor="w").pack(anchor="w")
-                else:
-                    ctk.CTkLabel(row, text=v, font=Fonts.BODY,
-                                 text_color=Colors.TEXT_PRIMARY, anchor="w",
-                                 width=widths[i]).grid(row=0, column=i, sticky="w",
-                                                        padx=Spacing.SM)
+            # 订单号
+            ctk.CTkLabel(row, text=order.get("order_no", ""), font=Fonts.BODY,
+                         text_color=Colors.TEXT_PRIMARY, anchor="w",
+                         width=105).grid(row=0, column=0, sticky="w", padx=Spacing.SM)
+
+            # 类型徽章（可点击循环切换）
+            tlabel, tfg, tbg = ORDER_TYPE_MAP.get(otype, ("现货", Colors.TEXT_MUTED, Colors.BG_HOVER))
+            ctk.CTkButton(row, text=tlabel, font=Fonts.TINY, width=44, height=22,
+                          fg_color=tbg, text_color=tfg, hover_color=tbg,
+                          corner_radius=Radius.FULL,
+                          command=lambda o=order: self._cycle_type(o)).grid(
+                row=0, column=1, sticky="w", padx=Spacing.SM)
+
+            # 客户
+            ctk.CTkLabel(row, text=order.get("customer", ""), font=Fonts.BODY,
+                         text_color=Colors.TEXT_PRIMARY, anchor="w",
+                         width=65).grid(row=0, column=2, sticky="w", padx=Spacing.SM)
+
+            # 商品（goods_name + spec 两行）
+            gname = order.get("goods_name", "") or order.get("product_name", "")
+            gf = ctk.CTkFrame(row, fg_color="transparent", width=130)
+            gf.grid(row=0, column=3, sticky="w", padx=Spacing.SM)
+            ctk.CTkLabel(gf, text=gname or "—", font=Fonts.SMALL,
+                         text_color=Colors.TEXT_PRIMARY, anchor="w").pack(anchor="w")
+            if order.get("spec"):
+                ctk.CTkLabel(gf, text=order.get("spec"), font=Fonts.TINY,
+                             text_color=Colors.TEXT_MUTED, anchor="w").pack(anchor="w")
+
+            # 数量
+            ctk.CTkLabel(row, text=str(order.get("quantity", 0)), font=Fonts.BODY,
+                         text_color=Colors.TEXT_PRIMARY, anchor="w",
+                         width=40).grid(row=0, column=4, sticky="w", padx=Spacing.SM)
+
+            # 金额
+            amt = order.get("amount", 0) or 0
+            ctk.CTkLabel(row, text=f"¥{amt:,.0f}" if amt else "—", font=Fonts.BODY,
+                         text_color=Colors.TEXT_PRIMARY, anchor="w",
+                         width=68).grid(row=0, column=5, sticky="w", padx=Spacing.SM)
+
+            # 状态快捷按钮
+            sf = ctk.CTkFrame(row, fg_color="transparent")
+            sf.grid(row=0, column=6, sticky="w", padx=Spacing.SM)
+            for skey, (slabel, sfg, sbg) in STATUS_MAP.items():
+                is_active = (skey == order.get("status", "pending"))
+                ctk.CTkButton(sf, text=slabel, font=Fonts.TINY, width=34, height=22,
+                              fg_color=sfg if is_active else "transparent",
+                              text_color="white" if is_active else sfg,
+                              hover_color=sfg,
+                              border_width=0 if is_active else 1,
+                              border_color=sfg,
+                              corner_radius=Radius.SM,
+                              command=lambda o=order, sk=skey: self._set_status(o, sk)).pack(
+                    side="left", padx=1)
+
+            # 备注
+            ctk.CTkLabel(row, text=order.get("notes", "") or "—", font=Fonts.SMALL,
+                         text_color=Colors.TEXT_MUTED, anchor="w",
+                         width=70).grid(row=0, column=7, sticky="w", padx=Spacing.SM)
+
+            # 日期 + 倒计时
+            df = ctk.CTkFrame(row, fg_color="transparent", width=80)
+            df.grid(row=0, column=8, sticky="w", padx=Spacing.SM)
+            ctk.CTkLabel(df, text=order.get("created_at", "")[:10], font=Fonts.SMALL,
+                         text_color=Colors.TEXT_PRIMARY, anchor="w").pack(anchor="w")
+            ship = _ship_status(order)
+            if ship:
+                ctk.CTkLabel(df, text=ship[0], font=Fonts.TINY,
+                             text_color=ship[1], anchor="w").pack(anchor="w")
 
             # 操作按钮
             btn_f = ctk.CTkFrame(row, fg_color="transparent")
-            btn_f.grid(row=0, column=len(vals), sticky="w", padx=Spacing.SM)
+            btn_f.grid(row=0, column=9, sticky="w", padx=Spacing.SM)
             ctk.CTkButton(btn_f, text="✏️", font=Fonts.SMALL, width=28, height=26,
                           fg_color=Colors.BG_INPUT, hover_color=Colors.PRIMARY_LIGHT,
                           text_color=Colors.TEXT_SECONDARY, corner_radius=Radius.SM,
@@ -453,6 +490,17 @@ class OrdersTab(ctk.CTkFrame):
         self.db.log("更新状态", f"订单 {order.get('order_no', '')} → {STATUS_MAP[new_status][0]}",
                     self.current_user["id"], self.current_user["username"])
         Toast(self, f"✅ 已切换为{STATUS_MAP[new_status][0]}")
+        self._load()
+
+    def _cycle_type(self, order):
+        """点击类型徽章循环切换 现货→预售→预存→现货"""
+        current = order.get("order_type", "normal")
+        idx = ORDER_TYPE_CYCLE.index(current) if current in ORDER_TYPE_CYCLE else 0
+        nxt = ORDER_TYPE_CYCLE[(idx + 1) % len(ORDER_TYPE_CYCLE)]
+        self.db.update_order(order["id"], order_type=nxt)
+        self.db.log("修改类型", f"订单 {order.get('order_no', '')} → {ORDER_TYPE_MAP[nxt][0]}",
+                    self.current_user["id"], self.current_user["username"])
+        Toast(self, f"✅ 已标记为{ORDER_TYPE_MAP[nxt][0]}")
         self._load()
 
     def _add(self):

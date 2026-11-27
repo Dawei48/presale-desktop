@@ -70,6 +70,14 @@ class Database:
                     notes       TEXT DEFAULT '',
                     status      TEXT DEFAULT 'pending',
                     ship_days   REAL DEFAULT 30,
+                    order_type  TEXT DEFAULT 'normal',
+                    goods_name  TEXT DEFAULT '',
+                    spec        TEXT DEFAULT '',
+                    receiver_name  TEXT DEFAULT '',
+                    receiver_phone TEXT DEFAULT '',
+                    receiver_addr  TEXT DEFAULT '',
+                    amount      REAL DEFAULT 0,
+                    shop_type   TEXT DEFAULT '',
                     created_at  TEXT DEFAULT (datetime('now','localtime')),
                     updated_at  TEXT DEFAULT (datetime('now','localtime')),
                     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
@@ -94,6 +102,19 @@ class Database:
             ocols = [r[1] for r in conn.execute("PRAGMA table_info(orders)").fetchall()]
             if "ship_days" not in ocols:
                 conn.execute("ALTER TABLE orders ADD COLUMN ship_days REAL DEFAULT 30")
+            # 迁移: orders 加新字段（订单类型/发货状态/收货信息/金额等）
+            for col, ddl in [
+                ("order_type", "TEXT DEFAULT 'normal'"),
+                ("goods_name", "TEXT DEFAULT ''"),
+                ("spec", "TEXT DEFAULT ''"),
+                ("receiver_name", "TEXT DEFAULT ''"),
+                ("receiver_phone", "TEXT DEFAULT ''"),
+                ("receiver_addr", "TEXT DEFAULT ''"),
+                ("amount", "REAL DEFAULT 0"),
+                ("shop_type", "TEXT DEFAULT ''"),
+            ]:
+                if col not in ocols:
+                    conn.execute(f"ALTER TABLE orders ADD COLUMN {col} {ddl}")
 
 # 首次安装不再创建默认账号，由用户自己注册管理员
 
@@ -294,22 +315,27 @@ class Database:
             ).fetchone()
             return bool(row)
 
-    def add_order(self, product_id, quantity=1, order_no="", customer="", notes="", created_at=None, ship_days=30):
+    def add_order(self, product_id, quantity=1, order_no="", customer="", notes="", created_at=None, ship_days=30,
+                  order_type="normal", goods_name="", spec="",
+                  receiver_name="", receiver_phone="", receiver_addr="", amount=0, shop_type=""):
         with self._conn() as conn:
+            fields = ["product_id", "order_no", "customer", "quantity", "notes",
+                      "ship_days", "order_type", "goods_name", "spec",
+                      "receiver_name", "receiver_phone", "receiver_addr", "amount", "shop_type"]
+            values = [product_id, order_no, customer, quantity, notes,
+                      ship_days, order_type, goods_name, spec,
+                      receiver_name, receiver_phone, receiver_addr, amount, shop_type]
             if created_at:
-                cur = conn.execute(
-                    "INSERT INTO orders (product_id, order_no, customer, quantity, notes, created_at, ship_days) VALUES (?,?,?,?,?,?,?)",
-                    (product_id, order_no, customer, quantity, notes, created_at, ship_days)
-                )
-            else:
-                cur = conn.execute(
-                    "INSERT INTO orders (product_id, order_no, customer, quantity, notes, ship_days) VALUES (?,?,?,?,?,?)",
-                    (product_id, order_no, customer, quantity, notes, ship_days)
-                )
+                fields.append("created_at")
+                values.append(created_at)
+            placeholders = ",".join(["?"] * len(fields))
+            cur = conn.execute(f"INSERT INTO orders ({','.join(fields)}) VALUES ({placeholders})", values)
             return cur.lastrowid
 
     def update_order(self, order_id, **kwargs):
-        allowed = {"product_id", "order_no", "customer", "quantity", "notes", "status", "created_at", "ship_days"}
+        allowed = {"product_id", "order_no", "customer", "quantity", "notes", "status", "created_at", "ship_days",
+                   "order_type", "goods_name", "spec", "receiver_name", "receiver_phone",
+                   "receiver_addr", "amount", "shop_type"}
         fields = {k: v for k, v in kwargs.items() if k in allowed and v is not None}
         if not fields:
             return

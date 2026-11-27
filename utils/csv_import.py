@@ -38,7 +38,41 @@ FIELD_MAP = {
         "patterns": ["备注", "买家留言", "留言", "remark", "note", "memo"],
         "fallback": "备注",
     },
+    "receiver_phone": {
+        "patterns": ["收货电话", "收货人电话", "手机", "手机号", "联系电话", "电话", "mobile", "phone", "tel"],
+        "fallback": None,
+    },
+    "receiver_addr": {
+        "patterns": ["收货地址", "地址", "详细地址", "address", "addr"],
+        "fallback": None,
+    },
+    "amount": {
+        "patterns": ["实付金额", "实付", "应付金额", "订单金额", "商品金额", "金额", "amount", "total_amount"],
+        "fallback": None,
+    },
 }
+
+
+def detect_order_type(notes):
+    """根据备注关键词判断订单类型：预存 > 预售 > 现货"""
+    if not notes:
+        return "normal"
+    if "预存" in notes:
+        return "stored"
+    if "预售" in notes:
+        return "presale"
+    return "normal"
+
+
+def parse_amount(s):
+    """清洗金额字符串为 float，失败返回 0"""
+    if not s:
+        return 0
+    s = str(s).replace("¥", "").replace("￥", "").replace(",", "").replace("元", "").strip()
+    try:
+        return float(s)
+    except (ValueError, TypeError):
+        return 0
 
 PLATFORM_HINTS = {
     "taobao": {"收货人", "宝贝标题", "订单编号", "买家昵称", "成交时间"},
@@ -248,6 +282,9 @@ class CSVImportDialog(ctk.CTkToplevel):
             ("quantity", "数量"),
             ("created_at", "下单时间"),
             ("notes", "备注"),
+            ("receiver_phone", "收货电话"),
+            ("receiver_addr", "收货地址"),
+            ("amount", "金额"),
         ]
 
         row_idx = 0
@@ -345,7 +382,8 @@ class CSVImportDialog(ctk.CTkToplevel):
     def _get_current_mapping(self):
         """获取当前用户设置的映射"""
         mapping = {}
-        fields = ["order_no", "customer", "product", "quantity", "created_at", "notes"]
+        fields = ["order_no", "customer", "product", "quantity", "created_at", "notes",
+                  "receiver_phone", "receiver_addr", "amount"]
         for field in fields:
             combo = getattr(self, f"_combo_{field}", None)
             if combo:
@@ -428,14 +466,22 @@ class CSVImportDialog(ctk.CTkToplevel):
                 # 发货期限：按平台默认（抖音2天/淘宝3天/未知30天）
                 ship_days = PLATFORM_SHIP_DAYS.get(self.platform, SHIP_DEADLINE_DAYS)
 
-                # 插入订单（product_name 由 product_id 关联获取，status 默认 pending）
+                # 插入订单
+                notes = data.get("notes", "")
                 order_data = {
                     "order_no": data.get("order_no", ""),
                     "customer": data.get("customer", ""),
                     "quantity": qty,
-                    "notes": data.get("notes", ""),
+                    "notes": notes,
                     "created_at": created_at,
                     "ship_days": ship_days,
+                    "order_type": detect_order_type(notes),
+                    "goods_name": data.get("product", ""),
+                    "receiver_name": data.get("customer", ""),
+                    "receiver_phone": data.get("receiver_phone", ""),
+                    "receiver_addr": data.get("receiver_addr", ""),
+                    "amount": parse_amount(data.get("amount", "")),
+                    "shop_type": self.platform,
                 }
 
                 # 查重：订单号已存在则跳过（保留你手动更新的发货状态）

@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>放心预 · 订单管理（重做后 mockup）</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    /* 青花瓷主题 —— 与 ui/styles.py 严格一致 */
+    --primary:#2D5AA8; --primary-hover:#23478A; --primary-light:#EDF3FB; --primary-dim:#DCE8F7;
+    --success:#1F9D6E; --success-light:#E2F5EC;
+    --warning:#C98A2E; --warning-light:#F8EFDD;
+    --danger:#D9544D; --danger-light:#FBE8E6;
+    --sidebar:#1B2A44; --sidebar-hover:#243654; --sidebar-active:#2D5AA8; --sidebar-text:#A8B6CE; --sidebar-text-hi:#F5F7FA;
+    --bg:#F7F5F1; --card:#FFFFFF; --input:#F3F1EC;
+    --text:#2B2A26; --text-2:#5C5A54; --text-muted:#9A968E;
+    --border:#E4E1DA;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{
+    font-family:'Inter','Microsoft YaHei',system-ui,sans-serif;
+    background:var(--bg); color:var(--text);
+    display:flex; height:100vh; overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  /* 侧边栏 */
+  .sidebar{
+    width:220px; background:var(--sidebar); flex-shrink:0;
+    display:flex; flex-direction:column; padding:24px 12px;
+  }
+  .logo{display:flex; align-items:center; gap:10px; padding:0 8px; margin-bottom:20px;}
+  .logo .mark{width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,#3A6DB8,#2D5AA8);display:flex;align-items:center;justify-content:center;font-size:18px;}
+  .logo .name{color:var(--sidebar-text-hi);font-weight:700;font-size:16px;letter-spacing:.5px;}
+  .logo .sub{color:var(--sidebar-text);font-size:11px;margin-top:1px;}
+  .divider{height:1px;background:var(--sidebar-hover);margin:0 8px 16px;}
+  .nav{display:flex;flex-direction:column;gap:2px;}
+  .nav-item{
+    display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;
+    color:var(--sidebar-text);font-size:14px;cursor:pointer;transition:.15s;
+  }
+  .nav-item:hover{background:var(--sidebar-hover);color:var(--sidebar-text-hi);}
+  .nav-item.active{background:var(--sidebar-active);color:var(--sidebar-text-hi);font-weight:600;}
+  .nav-item .ico{width:18px;text-align:center;font-size:15px;}
+  .nav-item .badge{margin-left:auto;background:var(--primary);color:#fff;font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px;}
+  .nav-item.active .badge{background:rgba(255,255,255,.25);}
+  .nav-bottom{margin-top:auto;padding:16px 8px 0;border-top:1px solid var(--sidebar-hover);}
+  .user{display:flex;align-items:center;gap:10px;}
+  .avatar{width:32px;height:32px;border-radius:8px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;}
+  .user .uname{color:var(--sidebar-text-hi);font-size:13px;font-weight:600;}
+  .user .urole{color:var(--sidebar-text);font-size:11px;}
+
+  /* 主区 */
+  .main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+  .content{padding:28px 32px;overflow-y:auto;flex:1;}
+  .page-title{font-size:20px;font-weight:700;letter-spacing:-.3px;margin-bottom:4px;}
+  .page-sub{font-size:13px;color:var(--text-muted);margin-bottom:24px;}
+
+  /* 统计卡 */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
+  .stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
+  .stat .label{font-size:12px;color:var(--text-muted);margin-bottom:6px;display:flex;align-items:center;gap:6px;}
+  .stat .num{font-size:26px;font-weight:700;letter-spacing:-.5px;}
+  .stat .num small{font-size:13px;font-weight:500;color:var(--text-muted);}
+  .dot{width:8px;height:8px;border-radius:50%;}
+
+  /* 工具栏 */
+  .toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+  .search{flex:0 0 260px;display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text-muted);font-size:13px;}
+  .search input{border:none;outline:none;background:none;font-size:13px;color:var(--text);width:100%;font-family:inherit;}
+  .pill-group{display:flex;gap:4px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:3px;}
+  .pill{padding:6px 12px;border-radius:6px;font-size:12px;font-weight:500;color:var(--text-2);cursor:pointer;transition:.15s;}
+  .pill.active{background:var(--primary);color:#fff;font-weight:600;}
+  .spacer{flex:1;}
+  .btn{display:flex;align-items:center;gap:6px;padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s;border:none;}
+  .btn-primary{background:var(--primary);color:#fff;}
+  .btn-primary:hover{background:var(--primary-hover);}
+  .btn-success{background:var(--success);color:#fff;}
+  .btn-ghost{background:var(--primary-light);color:var(--primary);}
+
+  /* 表格 */
+  .table-card{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+  .table-head{display:grid;grid-template-columns:150px 76px 96px 1fr 56px 90px 150px 100px 110px;background:var(--sidebar);color:var(--sidebar-text-hi);font-size:12px;font-weight:600;padding:11px 16px;}
+  .row{display:grid;grid-template-columns:150px 76px 96px 1fr 56px 90px 150px 100px 110px;padding:13px 16px;font-size:13px;border-top:1px solid var(--border);align-items:center;transition:.1s;}
+  .row:hover{background:#FAF9F6;}
+  .row .order-no{color:var(--primary);font-weight:600;}
+  .row .goods{display:flex;align-items:center;gap:8px;}
+  .thumb{width:34px;height:34px;border-radius:7px;background:linear-gradient(135deg,#E8E4DB,#D8D2C4);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:15px;}
+  .gname{font-weight:500;color:var(--text);}
+  .gmore{font-size:11px;color:var(--text-muted);}
+  .amount{font-weight:700;}
+
+  /* 类型徽章（pill badge，借鉴 Notion） */
+  .type{display:inline-flex;align-items:center;font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;width:fit-content;}
+  .type-normal{background:#F0EEE9;color:#5C5A54;}
+  .type-presale{background:var(--primary-light);color:var(--primary);}
+  .type-stored{background:var(--warning-light);color:var(--warning);}
+
+  .muted{color:var(--text-muted);}
+  .note{font-size:12px;color:var(--text-2);}
+  .note .kw{color:var(--warning);font-weight:600;}
+</style>
+</head>
+<body>
+  <!-- 侧边栏 -->
+  <div class="sidebar">
+    <div class="logo">
+      <div class="mark">📦</div>
+      <div>
+        <div class="name">放心预</div>
+        <div class="sub">预售管理系统</div>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="nav">
+      <div class="nav-item"><span class="ico">🏠</span>仪表盘</div>
+      <div class="nav-item"><span class="ico">🏷️</span>品牌管理</div>
+      <div class="nav-item active"><span class="ico">📋</span>全部订单</div>
+      <div class="nav-item"><span class="ico">🏺</span>预售订单<span class="badge">12</span></div>
+      <div class="nav-item"><span class="ico">🔍</span>全局搜索</div>
+      <div class="nav-item"><span class="ico">👥</span>团队管理</div>
+    </div>
+    <div class="nav-bottom">
+      <div class="user">
+        <div class="avatar">刘</div>
+        <div>
+          <div class="uname">刘金玲</div>
+          <div class="urole">👑 管理员</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主区 -->
+  <div class="main">
+    <div class="content">
+      <div class="page-title">全部订单</div>
+      <div class="page-sub">今日新导入 238 笔 · 已自动识别商品与订单类型</div>
+
+      <!-- 统计卡 -->
+      <div class="stats">
+        <div class="stat">
+          <div class="label"><span class="dot" style="background:var(--text-muted)"></span>今日订单</div>
+          <div class="num">238 <small>笔</small></div>
+        </div>
+        <div class="stat">
+          <div class="label"><span class="dot" style="background:var(--primary)"></span>预售中</div>
+          <div class="num">12 <small>笔待导出</small></div>
+        </div>
+        <div class="stat">
+          <div class="label"><span class="dot" style="background:var(--warning)"></span>预存挂账</div>
+          <div class="num">35 <small>笔</small></div>
+        </div>
+        <div class="stat">
+          <div class="label"><span class="dot" style="background:var(--success)"></span>待发货</div>
+          <div class="num">191 <small>笔</small></div>
+        </div>
+      </div>
+
+      <!-- 工具栏 -->
+      <div class="toolbar">
+        <div class="search">🔍 <input placeholder="搜索订单号、客户、商品..."></div>
+        <div class="pill-group">
+          <div class="pill active">全部</div>
+          <div class="pill">现货</div>
+          <div class="pill">预售</div>
+          <div class="pill">预存</div>
+        </div>
+        <div class="spacer"></div>
+        <div class="btn btn-ghost">📥 导入CSV</div>
+        <div class="btn btn-success">🏺 导出生产单</div>
+      </div>
+
+      <!-- 表格 -->
+      <div class="table-card">
+        <div class="table-head">
+          <div>订单号</div><div>类型</div><div>客户</div><div>商品</div><div>数量</div><div>金额</div><div>收货信息</div><div>备注</div><div>下单时间</div>
+        </div>
+
+        <div class="row">
+          <div class="order-no">DT20260902001</div>
+          <div><span class="type type-presale">预售</span></div>
+          <div>王女士</div>
+          <div class="goods"><div class="thumb">🏺</div><div><div class="gname">手工柴烧主人杯</div><div class="gmore">青花·大号 ×2</div></div></div>
+          <div>2</div>
+          <div class="amount">¥458</div>
+          <div class="muted">景德镇市珠山区·138****</div>
+          <div class="note"><span class="kw">预售</span> 刻字:平安</div>
+          <div class="muted">09-02 14:32</div>
+        </div>
+
+        <div class="row">
+          <div class="order-no">DT20260902002</div>
+          <div><span class="type type-stored">预存</span></div>
+          <div>李女士</div>
+          <div class="goods"><div class="thumb">🍵</div><div><div class="gname">青花缠枝莲盖碗</div><div class="gmore">标准款 ×1</div></div></div>
+          <div>1</div>
+          <div class="amount">¥268</div>
+          <div class="muted">南昌市东湖区·137****</div>
+          <div class="note"><span class="kw">预存</span> 客户说先存着</div>
+          <div class="muted">09-02 14:18</div>
+        </div>
+
+        <div class="row">
+          <div class="order-no">DT20260902003</div>
+          <div><span class="type type-normal">现货</span></div>
+          <div>张先生</div>
+          <div class="goods"><div class="thumb">🏺</div><div><div class="gname">青花山水小茶杯</div><div class="gmore">×6</div></div></div>
+          <div>6</div>
+          <div class="amount">¥198</div>
+          <div class="muted">杭州市西湖区·159****</div>
+          <div class="note muted">—</div>
+          <div class="muted">09-02 14:05</div>
+        </div>
+
+        <div class="row">
+          <div class="order-no">DT20260902004</div>
+          <div><span class="type type-presale">预售</span></div>
+          <div>赵女士</div>
+          <div class="goods"><div class="thumb">🏺</div><div><div class="gname">釉里红大花瓶</div><div class="gmore">高35cm 孤品 ×1</div></div></div>
+          <div>1</div>
+          <div class="amount">¥1280</div>
+          <div class="muted">上海市浦东新区·136****</div>
+          <div class="note"><span class="kw">预售</span> 交期30天</div>
+          <div class="muted">09-02 13:47</div>
+        </div>
+
+        <div class="row">
+          <div class="order-no">DT20260902005</div>
+          <div><span class="type type-normal">现货</span></div>
+          <div>陈先生</div>
+          <div class="goods"><div class="thumb">🫖</div><div><div class="gname">青花茶壶套组</div><div class="gmore">×1</div></div></div>
+          <div>1</div>
+          <div class="amount">¥668</div>
+          <div class="muted">深圳市南山区·188****</div>
+          <div class="note muted">—</div>
+          <div class="muted">09-02 13:22</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

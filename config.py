@@ -5,7 +5,7 @@ import os
 import sys
 
 APP_NAME = "放心预"
-APP_VERSION = "1.6.0"
+APP_VERSION = "2.0.0"
 APP_SUBTITLE = "预售管理系统"
 
 if getattr(sys, 'frozen', False):
