@@ -487,20 +487,182 @@
       b.addEventListener('click', () => { closeDrawer(); primary.fn(o); });
       foot.appendChild(b);
     }
-    const sp = el('div', 'sp'); foot.appendChild(sp);
-    const typeBtn = el('button', 'btn btn-ghost', '改类型');
-    typeBtn.addEventListener('click', async () => {
-      const order = ['normal', 'presale', 'stored'];
-      const next = order[(order.indexOf(o.order_type || 'normal') + 1) % 3];
-      const r = await API.setOrderType(o.id, next);
-      if (r.ok) { o.order_type = next; toast('已改为' + ({ normal: '现货', presale: '预售', stored: '预存' })[next]); load(); }
-      else toast(r.error || '修改失败', 'warn');
-    });
-    foot.appendChild(typeBtn);
+    const edit = el('button', 'btn btn-ghost', '编辑');
+    edit.addEventListener('click', () => openOrderEditor(o));
+    foot.appendChild(edit);
 
+    const sp = el('div', 'sp'); foot.appendChild(sp);
+
+    const del = el('button', 'btn btn-quiet danger', '删除');
+    let armed = false;
+    del.addEventListener('click', async () => {
+      if (!armed) {
+        armed = true;
+        del.textContent = '确认删除？';
+        setTimeout(() => { armed = false; del.textContent = '删除'; }, 2600);
+        return;
+      }
+      const r = await API.deleteOrder(o.id);
+      if (!r.ok) return toast(r.error || '删除失败', 'warn');
+      closeDrawer();
+      toast('已删除');
+      load();
+    });
+    foot.appendChild(del);
+
+    openDrawerShell();
+  }
+
+  function openDrawerShell() {
     $('#scrim').classList.add('on');
     $('#drawer').classList.add('on');
     $('#drawer').setAttribute('aria-hidden', 'false');
+  }
+
+  /* ── 订单表单（新建 / 编辑共用） ─────────────────────────── */
+  async function openOrderEditor(order) {
+    const isNew = !order;
+    const o = order || { status: 'ready', order_type: 'normal', quantity: 1 };
+    $('#drawer-title').textContent = isNew ? '新建订单' : '编辑订单';
+
+    // 商品名补全：把商品库已有的名字喂给 datalist，少打字也少打错
+    let names = [];
+    try {
+      const pr = await API.products('');
+      if (pr.ok && Array.isArray(pr.data)) {
+        names = pr.data.map(p => p.name).filter(Boolean).slice(0, 200);
+      }
+    } catch (_) {}
+
+    const body = $('#drawer-body');
+    body.textContent = '';
+    const form = el('div', 'form');
+    const dl = el('datalist');
+    dl.id = 'goods-names';
+    names.forEach(n => {
+      const op = el('option');
+      op.value = n;
+      dl.appendChild(op);
+    });
+    body.appendChild(dl);
+
+    const field = (label, key, opts) => {
+      opts = opts || {};
+      const wrap = el('label', opts.full ? 'full' : null);
+      const cap = el('span', null, label);
+      if (opts.required) {
+        const star = el('i', 'req', ' *');
+        cap.appendChild(star);
+      }
+      wrap.appendChild(cap);
+      let input;
+      if (opts.type === 'select') {
+        input = el('select');
+        opts.options.forEach(([v, t]) => {
+          const op = el('option', null, t);
+          op.value = v;
+          input.appendChild(op);
+        });
+        input.value = o[key] != null ? o[key] : opts.options[0][0];
+      } else if (opts.type === 'textarea') {
+        input = el('textarea');
+        input.rows = opts.rows || 3;
+        input.value = o[key] || '';
+      } else {
+        input = el('input');
+        input.type = opts.type || 'text';
+        input.value = o[key] != null ? o[key] : (opts.default || '');
+        if (opts.placeholder) input.placeholder = opts.placeholder;
+        if (opts.list) input.setAttribute('list', opts.list);
+        if (opts.money) {
+          const box = el('div', 'money');
+          box.appendChild(el('span', null, '¥'));
+          box.appendChild(input);
+          input.dataset.key = key;
+          wrap.appendChild(box);
+          form.appendChild(wrap);
+          return input;
+        }
+      }
+      input.dataset.key = key;
+      wrap.appendChild(input);
+      form.appendChild(wrap);
+      return input;
+    };
+
+    field('客户', 'receiver_name', { placeholder: '收货人', required: true });
+    field('电话', 'receiver_phone', { placeholder: '手机号' });
+    field('商品名称', 'goods_name', {
+      full: true, required: true, list: 'goods-names',
+      placeholder: '可以从下拉里选，也可以直接打',
+    });
+    field('规格', 'spec', { placeholder: '如 110ml / 32cm' });
+    field('数量', 'quantity', { type: 'number', default: 1 });
+    field('订单号', 'order_no', { placeholder: '可留空，批量导入时才有' });
+    field('金额', 'amount', { type: 'number', placeholder: '0', money: true });
+    field('类型', 'order_type', {
+      type: 'select',
+      options: [['normal', '现货'], ['presale', '预售'], ['stored', '预存']],
+    });
+    field('状态', 'status', {
+      type: 'select',
+      options: [['ready', '待发货'], ['confirm', '待确认延发'], ['producing', '待生产'],
+                ['stored', '已挂账'], ['shipped', '已发货'], ['done', '已完成']],
+    });
+    field('地址', 'receiver_addr', { full: true, type: 'textarea', rows: 2, placeholder: '收货地址' });
+    const noteInput = field('备注', 'notes', {
+      full: true, type: 'textarea',
+      placeholder: '写「预售」会自动转生产，写「预存」会挂账',
+    });
+
+    // 备注里的关键词自动带出类型与状态，省得她自己判断
+    const typeSel = form.querySelector('[data-key="order_type"]');
+    const statusSel = form.querySelector('[data-key="status"]');
+    noteInput.addEventListener('input', () => {
+      const v = noteInput.value;
+      if (v.includes('预存')) {
+        typeSel.value = 'stored';
+        statusSel.value = 'stored';
+      } else if (v.includes('预售')) {
+        typeSel.value = 'presale';
+        if (statusSel.value === 'ready') statusSel.value = 'confirm';
+      }
+    });
+
+    body.appendChild(form);
+
+    const foot = $('#drawer-foot');
+    foot.textContent = '';
+
+    const save = el('button', 'btn btn-primary', isNew ? '保存订单' : '保存修改');
+    save.addEventListener('click', async () => {
+      const data = isNew ? {} : { id: o.id };
+      form.querySelectorAll('[data-key]').forEach(inp => {
+        data[inp.dataset.key] = inp.value;
+      });
+      if (!data.receiver_name || !String(data.receiver_name).trim()) {
+        return toast('客户名字还没填', 'warn');
+      }
+      if (!data.goods_name || !String(data.goods_name).trim()) {
+        return toast('商品名称还没填', 'warn');
+      }
+      save.disabled = true;
+      save.textContent = '保存中…';
+      const r = await API.saveOrder(data);
+      save.disabled = false;
+      save.textContent = isNew ? '保存订单' : '保存修改';
+      if (!r.ok) return toast(r.error || '保存失败', 'warn');
+      closeDrawer();
+      toast(isNew ? '已新建订单' : '已保存');
+      load();
+    });
+    foot.appendChild(save);
+
+    const cancel = el('button', 'btn btn-quiet', '取消');
+    cancel.addEventListener('click', () => (order ? openDrawer(order) : closeDrawer()));
+    foot.appendChild(cancel);
+
+    openDrawerShell();
   }
 
   function closeDrawer() {
@@ -603,6 +765,7 @@
     });
 
     $('#btn-search').addEventListener('click', openCmd);
+    $('#btn-new').addEventListener('click', () => openOrderEditor(null));
     $('#scrim').addEventListener('click', closeDrawer);
     $('#drawer-close').addEventListener('click', closeDrawer);
     $('#btn-import').addEventListener('click', async () => {

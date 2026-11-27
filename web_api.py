@@ -150,6 +150,121 @@ class WebApi:
         except Exception as e:
             return _err(e)
 
+    def _manual_product(self):
+        """手录订单总要挂个商品；没有就用「手动录入」兜底。"""
+        brands = self.db.get_brands()
+        b = next((x for x in brands if x.get("name") == "手动录入"), None)
+        bid = b["id"] if b else self.db.add_brand("手动录入")
+        prods = self.db.get_products(brand_id=bid)
+        p = next((x for x in prods if x.get("name") == "手动录入"), None)
+        return p["id"] if p else self.db.add_product(bid, "手动录入")
+
+    def save_order(self, data):
+        """新增或更新订单。data 带 id 就是更新。"""
+        try:
+            if not isinstance(data, dict):
+                return {"ok": False, "error": "参数错误"}
+            oid = data.get("id")
+            fields = {}
+            for k in ("order_no", "customer", "quantity", "notes", "status",
+                      "order_type", "goods_name", "spec", "receiver_name",
+                      "receiver_phone", "receiver_addr", "amount", "shop_type",
+                      "ship_days"):
+                if k in data and data[k] is not None and data[k] != "":
+                    fields[k] = data[k]
+
+            if "quantity" in fields:
+                try:
+                    fields["quantity"] = max(1, int(float(fields["quantity"])))
+                except (TypeError, ValueError):
+                    fields["quantity"] = 1
+            if "amount" in fields:
+                try:
+                    fields["amount"] = float(fields["amount"])
+                except (TypeError, ValueError):
+                    fields["amount"] = 0
+
+            if oid:
+                self.db.update_order(int(oid), **fields)
+                self.db.log("编辑订单", f"订单 {oid}")
+                return {"ok": True, "data": {"id": int(oid)}}
+
+            goods = fields.get("goods_name") or "未命名商品"
+            pid = None
+            for p in self.db.get_products():
+                if p.get("name") == goods:
+                    pid = p["id"]
+                    break
+            if pid is None:
+                pid = self._manual_product()
+            fields.setdefault("customer", "")
+            fields.setdefault("order_no", "")
+            new_id = self.db.add_order(product_id=pid, **fields)
+            self.db.log("新增订单", f"{fields.get('order_no') or new_id}")
+            return {"ok": True, "data": {"id": new_id}}
+        except Exception as e:
+            return _err(e)
+
+    def delete_order(self, oid):
+        try:
+            self.db.delete_order(int(oid))
+            self.db.log("删除订单", f"订单 {oid}")
+            return {"ok": True}
+        except Exception as e:
+            return _err(e)
+
+    def save_product(self, data):
+        try:
+            if not isinstance(data, dict):
+                return {"ok": False, "error": "参数错误"}
+            pid = data.get("id")
+            name = (data.get("name") or "").strip()
+            if not name:
+                return {"ok": False, "error": "商品名不能为空"}
+
+            brands = self.db.get_brands()
+            b = next((x for x in brands if x.get("name") == "手动录入"), None)
+            bid = b["id"] if b else self.db.add_brand("手动录入")
+
+            if pid:
+                self.db.update_product(int(pid), name=name,
+                                       notes=data.get("notes") or "",
+                                       image_path=data.get("image_path") or "")
+                return {"ok": True, "data": {"id": int(pid)}}
+            new_id = self.db.add_product(bid, name, price=0,
+                                         notes=data.get("notes") or "",
+                                         image_path=data.get("image_path") or "")
+            return {"ok": True, "data": {"id": new_id}}
+        except Exception as e:
+            return _err(e)
+
+    def delete_product(self, pid):
+        try:
+            self.db.delete_product(int(pid))
+            return {"ok": True}
+        except Exception as e:
+            return _err(e)
+
+    def pick_image(self):
+        """选一张产品图，复制到 data/images，返回可写进库的相对路径。"""
+        try:
+            import shutil
+            import uuid
+            res = self.window.create_file_dialog(
+                webview.OPEN_DIALOG, allow_multiple=False,
+                file_types=("图片 (*.png;*.jpg;*.jpeg;*.webp)", "所有文件 (*.*)"))
+            if not res:
+                return {"ok": False, "error": "已取消"}
+            src = res[0] if isinstance(res, (list, tuple)) else res
+            ext = os.path.splitext(src)[1].lower()
+            from config import IMAGES_DIR
+            os.makedirs(IMAGES_DIR, exist_ok=True)
+            dest = os.path.join(IMAGES_DIR, f"{uuid.uuid4().hex[:12]}{ext}")
+            shutil.copy2(src, dest)
+            return {"ok": True, "data": {"path": dest}}
+        except Exception as e:
+            return _err(e)
+
     def set_status(self, oid, status):
         try:
             allowed = {"confirm", "producing", "ready", "stored", "shipped", "done", "cancelled"}

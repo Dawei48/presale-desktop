@@ -78,6 +78,27 @@
       r.order_type = t;
       return { ok: true };
     },
+    save_order: async (d) => {
+      if (d.id) {
+        const r = rows.find(x => x.id === +d.id);
+        if (!r) return { ok: false, error: '订单不存在' };
+        Object.assign(r, d);
+        return { ok: true, data: { id: r.id } };
+      }
+      const id = ++seq;
+      rows.unshift(Object.assign({ id, order_no: String(id), quantity: 1,
+        status: 'ready', order_type: 'normal', created_at: dt(0) }, d));
+      return { ok: true, data: { id } };
+    },
+    delete_order: async (id) => {
+      const i = rows.findIndex(x => x.id === +id);
+      if (i < 0) return { ok: false, error: '订单不存在' };
+      rows.splice(i, 1);
+      return { ok: true };
+    },
+    save_product: async () => ({ ok: true, data: { id: 1 } }),
+    delete_product: async () => ({ ok: true }),
+    pick_image: async () => ({ ok: false, error: '浏览器预览模式无法选文件' }),
     export_production: async () => ({ ok: true, data: { count: 3, path: '' } }),
     import_csv: async () => ({ ok: false, error: '浏览器预览模式无法导入' }),
     products: async () => {
