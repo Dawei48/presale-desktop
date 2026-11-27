@@ -99,14 +99,43 @@
     save_product: async () => ({ ok: true, data: { id: 1 } }),
     delete_product: async () => ({ ok: true }),
     pick_image: async () => ({ ok: false, error: '浏览器预览模式无法选文件' }),
+    fetch_images: async () => ({ ok: false, error: '浏览器预览模式无法联网搜图，请用 exe' }),
+    apply_image: async () => ({ ok: false, error: '浏览器预览模式无法保存图片' }),
     export_production: async () => ({ ok: true, data: { count: 3, path: '' } }),
     import_csv: async () => ({ ok: false, error: '浏览器预览模式无法导入' }),
+    kilns: async () => {
+      const map = {};
+      rows.forEach(r => {
+        const parts = String(r.goods_name || '').split('·').map(s => s.trim()).filter(Boolean);
+        const kiln = parts.length > 1 ? parts[0] : '未标注窑口';
+        const prod = parts.length > 1 ? parts.slice(1).join(' · ') : (r.goods_name || '');
+        map[kiln] = map[kiln] || { name: kiln, products: {}, orders: 0, pending: 0 };
+        const k = map[kiln];
+        k.orders += 1;
+        k.products[prod] = k.products[prod] || { name: prod, orders: 0, pending: 0, specs: new Set() };
+        const p = k.products[prod];
+        p.orders += 1;
+        if (r.status === 'confirm' || r.status === 'producing') {
+          p.pending += r.quantity || 1;
+          k.pending += r.quantity || 1;
+        }
+        if (r.spec) p.specs.add(r.spec);
+      });
+      return { ok: true, data: Object.values(map).map(k => ({
+        name: k.name, orders: k.orders, pending: k.pending,
+        products: Object.values(k.products).map(p => ({
+          name: p.name, orders: p.orders, pending: p.pending,
+          specs: [...p.specs],
+        })),
+      })) };
+    },
     products: async () => {
       const map = {};
       rows.forEach(r => {
         const kiln = String(r.goods_name).split('·')[0].trim();
         const k = kiln + '|' + r.goods_name;
-        map[k] = map[k] || { kiln, name: r.goods_name, order_count: 0, notes: r.spec };
+        map[k] = map[k] || { id: Object.keys(map).length + 1, kiln, name: r.goods_name,
+                             order_count: 0, notes: r.spec, image_path: '', thumb: '' };
         map[k].order_count += 1;
       });
       return { ok: true, data: Object.values(map) };

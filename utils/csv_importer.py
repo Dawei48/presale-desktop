@@ -111,13 +111,42 @@ def _default_product(db):
     return pid, bid
 
 
-def import_csv_file(db, path):
-    """返回 {'added': n, 'dup': n, 'invalid': n}"""
+FIELD_ALIAS = {"product": "goods_name"}
+
+
+def _ai_fill_missing(headers, idx):
+    """规则没认出来的列，交给 DeepSeek 认。返回被 AI 补上的字段名列表。"""
+    missing = [f for f, i in idx.items() if i is None]
+    if not missing:
+        return []
+    try:
+        from config import ai_enabled, DEEPSEEK_API_KEY
+        if not ai_enabled():
+            return []
+        from utils.ai_parser import parse_headers_with_ai
+        mapping = parse_headers_with_ai(headers, DEEPSEEK_API_KEY)
+        filled = []
+        for k, col in mapping.items():
+            key = FIELD_ALIAS.get(k, k)
+            if key in idx and idx[key] is None:
+                try:
+                    idx[key] = headers.index(col)
+                    filled.append(key)
+                except ValueError:
+                    continue
+        return filled
+    except Exception:
+        return []
+
+
+def import_csv_file(db, path, use_ai=True):
+    """返回 {'added','dup','invalid','ai_fields','ai_used'}"""
     headers, rows = _read_rows(path)
     if not headers:
         raise ValueError("文件为空或编码无法识别")
 
     idx = {f: _match(headers, f) for f in FIELD_PATTERNS}
+    ai_fields = _ai_fill_missing(headers, idx) if use_ai else []
     if idx["order_no"] is None and idx["goods_name"] is None:
         raise ValueError("没识别出订单号列或商品列，请确认这是平台导出的订单 CSV")
 
@@ -178,4 +207,5 @@ def import_csv_file(db, path):
         )
         added += 1
 
-    return {"added": added, "dup": dup, "invalid": invalid}
+    return {"added": added, "dup": dup, "invalid": invalid,
+            "ai_fields": ai_fields, "ai_used": bool(ai_fields)}

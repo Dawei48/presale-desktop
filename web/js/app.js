@@ -36,7 +36,7 @@
   const PAGE_META = {
     todo:       { title: '待办',     showFilters: true },
     orders:     { title: '全部订单', showFilters: true },
-    production: { title: '生产单',   showFilters: false },
+    kilns:      { title: '窑口',     showFilters: false },
     products:   { title: '商品库',   showFilters: false },
     imports:    { title: '导入记录', showFilters: false },
     settings:   { title: '设置',     showFilters: false },
@@ -97,12 +97,11 @@
       else { S.rows = r.data.rows || []; S.counts = r.data.counts || {}; S.todo = r.data.todo || 0; }
       if (page === 'todo') buildGroups();
       render();
-    } else if (page === 'production') {
-      const r = await API.orders('presale', '');
+    } else if (page === 'kilns') {
+      const r = await API.kilns();
       S.loading = false;
-      if (!r.ok) { S.error = r.error; S.rows = []; }
-      else { S.rows = (r.data.rows || []).filter(o => o.status === 'producing'); }
-      buildProduction();
+      if (!r.ok) { S.error = r.error; S.kilns = []; }
+      else S.kilns = r.data || [];
       render();
     } else if (page === 'products') {
       const r = await API.products('');
@@ -183,8 +182,11 @@
       $('#page-sub').append('今天 ', b1, ' 没走完，', b2, ' 在等你动手');
     } else if (S.page === 'orders') {
       $('#page-sub').textContent = '共 ' + (c.total || S.rows.length) + ' 单，按导入时间倒序';
-    } else if (S.page === 'production') {
-      $('#page-sub').textContent = '按窑口合并，一张单子交给一个窑口';
+    } else if (S.page === 'kilns') {
+      const n = (S.kilns || []).length;
+      $('#page-sub').textContent = n
+        ? `${n} 个窑口，共 ${(S.kilns || []).reduce((a, k) => a + k.orders, 0)} 单`
+        : '还没有订单，导入后会按商品名自动分出窑口';
     } else {
       $('#page-sub').textContent = '';
     }
@@ -209,8 +211,10 @@
         : '还没有订单', S.keyword ? '换个关键词试试' : '导入一份 CSV 就能开始');
       if (S.page === 'todo') renderGroups(list);
       else renderFlat(list, S.rows);
-    } else if (S.page === 'production') {
-      if (!S.rows.length) return renderEmpty(list, '暂时没有待生产的单子', '新预售单确认延发后会自动进来');
+    } else if (S.page === 'kilns') {
+      if (!S.kilns || !S.kilns.length) {
+        return renderEmpty(list, '还没有窑口', '导入订单后，会按商品名的第一段自动分出窑口');
+      }
       renderKilns(list);
     } else if (S.page === 'products') {
       if (!S.rows.length) return renderEmpty(list, '商品库还是空的', '导入订单时会自动建立商品');
@@ -354,42 +358,136 @@
     S.kilns.forEach(k => {
       const grp = el('div', 'group');
       const head = el('div', 'group-head');
-      head.appendChild(el('h2', null, k.label));
-      head.appendChild(el('span', 'cnt', k.rows.length + ' 单 · ' + k.qty + ' 件'));
-      head.appendChild(el('span', 'hint',
-        k.rows.length > 1 ? '可合并成一张生产单给窑口' : '可生成一张生产单给窑口'));
+      head.appendChild(el('h2', null, k.name));
+      head.appendChild(el('span', 'cnt',
+        k.products.length + ' 款 · 待生产 ' + k.pending + ' 件'));
+      head.appendChild(el('span', 'hint', '累计 ' + k.orders + ' 单'));
       const btn = el('button', 'more', '导出生产单');
       btn.addEventListener('click', () => exportKiln(k));
       head.appendChild(btn);
       grp.appendChild(head);
-      const cols = el('div', 'cols');
-      ['客户', '商品', '数量', '状态', '操作'].forEach((t, i) => {
-        cols.appendChild(el('span', i === 2 ? 'num' : (i === 4 ? 'act' : null), t));
+
+      const cols = el('div', 'cols kcols');
+      ['商品', '规格', '待生产', '累计'].forEach((t, i) => {
+        cols.appendChild(el('span', i >= 2 ? 'num' : null, t));
       });
       grp.appendChild(cols);
-      k.rows.forEach(o => grp.appendChild(rowEl(o, false)));
+
+      k.products.forEach(p => {
+        const r = el('div', 'row krow');
+        const item = el('div', 'item');
+        item.appendChild(el('div', 'g', p.name));
+        r.appendChild(item);
+        r.appendChild(el('div', 'spec', p.specs.length ? p.specs.join(' / ') : '—'));
+        r.appendChild(el('div', 'qty', p.pending ? p.pending + ' 件' : '—'));
+        r.appendChild(el('div', 'qty', p.orders + ' 单'));
+        r.style.cursor = 'default';
+        grp.appendChild(r);
+      });
+
       list.appendChild(grp);
     });
   }
 
+  function fileUrl(p) {
+    if (!p) return '';
+    if (/^https?:/i.test(p)) return p;
+    return 'file:///' + String(p).replace(/\\/g, '/').replace(/^\/+/, '');
+  }
+
   function renderProducts(list) {
     const grp = el('div', 'group');
-    const cols = el('div', 'cols');
-    ['窑口', '品名', '件数', ''].forEach((t, i) =>
-      cols.appendChild(el('span', i === 2 ? 'num' : null, t)));
+    const cols = el('div', 'cols pcols');
+    ['图', '商品', '单数', ''].forEach((t, i) =>
+      cols.appendChild(el('span', i === 2 ? 'num' : (i === 3 ? 'act' : null), t)));
     grp.appendChild(cols);
+
     S.rows.forEach(p => {
-      const r = el('div', 'row');
-      r.appendChild(el('div', 'cust', p.kiln || '—'));
+      const r = el('div', 'row prow');
+      r.style.cursor = 'default';
+
+      const cellImg = el('div', 'thumb-cell');
+      if (p.thumb) {
+        const img = el('img', 'thumb');
+        img.src = p.thumb;
+        img.alt = '';
+        img.addEventListener('error', () => {
+          cellImg.textContent = '';
+          cellImg.appendChild(el('span', 'thumb ph', '无'));
+        });
+        cellImg.appendChild(img);
+      } else {
+        cellImg.appendChild(el('span', 'thumb ph', '无'));
+      }
+      r.appendChild(cellImg);
+
       const item = el('div', 'item');
       item.appendChild(el('div', 'g', p.name || '—'));
-      item.appendChild(el('div', 'm', p.notes || ''));
+      item.appendChild(el('div', 'm', (p.kiln || '') + (p.notes ? '　' + p.notes : '')));
       r.appendChild(item);
+
       r.appendChild(el('div', 'qty', String(p.order_count || 0)));
-      r.appendChild(el('div', 'acts'));
+
+      const acts = el('div', 'acts');
+      const b = el('button', 'act', p.thumb ? '换图' : '找图');
+      b.addEventListener('click', () => openImagePicker(p));
+      acts.appendChild(b);
+      r.appendChild(acts);
+
       grp.appendChild(r);
     });
     list.appendChild(grp);
+  }
+
+  /* ── 找图：先给候选，人选完才落库 ─────────────────────── */
+  async function openImagePicker(p) {
+    $('#drawer-title').textContent = '给「' + (p.name || '') + '」找图';
+    const body = $('#drawer-body');
+    body.textContent = '';
+    body.appendChild(el('div', 'quiet', '正在搜索…'));
+
+    const foot = $('#drawer-foot');
+    foot.textContent = '';
+    const cancel = el('button', 'btn btn-quiet', '取消');
+    cancel.addEventListener('click', closeDrawer);
+    foot.appendChild(cancel);
+
+    openDrawerShell();
+
+    const r = await API.fetchImages(p.name || '');
+    body.textContent = '';
+    if (!r.ok) {
+      body.appendChild(el('div', 'blank-t', r.error || '搜索失败'));
+      body.appendChild(el('div', 'blank-d', '可以换个更具体的商品名，或者直接手工上传'));
+      return;
+    }
+
+    body.appendChild(el('div', 'pick-note',
+      '搜索词：' + r.data.keyword + '　（搜到的不一定是你要的那款，点一张确认）'));
+
+    const grid = el('div', 'imgpick');
+    r.data.items.forEach(it => {
+      const btn = el('button');
+      const img = el('img');
+      img.src = it.thumb;
+      img.loading = 'lazy';
+      img.alt = it.title || '';
+      btn.appendChild(img);
+      btn.title = it.title || '';
+      btn.addEventListener('click', async () => {
+        btn.classList.add('busy');
+        const res = await API.applyImage(p.id, it.url, p.name);
+        if (!res.ok) {
+          btn.classList.remove('busy');
+          return toast(res.error || '保存失败', 'warn');
+        }
+        closeDrawer();
+        toast('已换上这张图');
+        load();
+      });
+      grid.appendChild(btn);
+    });
+    body.appendChild(grid);
   }
 
   function renderImports(list) {
@@ -673,9 +771,9 @@
 
   async function exportKiln(k) {
     toast('正在生成生产单…');
-    const r = await API.exportProduction({ kiln: k.key, ids: k.rows.map(o => o.id) });
+    const r = await API.exportProduction({ kiln: k.name });
     if (!r.ok) return toast(r.error || '导出失败', 'warn');
-    toast('已导出 ' + (r.data.count || k.rows.length) + ' 件，正在打开…');
+    toast('已导出 ' + (r.data.count || 0) + ' 款，正在打开…');
     if (r.data.path) API.openPath(r.data.path);
   }
 
@@ -772,7 +870,13 @@
       toast('请选择要导入的 CSV 文件…');
       const r = await API.importCsv();
       if (!r.ok) return toast(r.error || '导入取消', 'warn');
-      toast('导入完成：新增 ' + (r.data.added || 0) + ' 单，跳过重复 ' + (r.data.dup || 0));
+      const d = r.data || {};
+      let msg = '导入完成：新增 ' + (d.added || 0) + ' 单';
+      if (d.dup) msg += '，跳过重复 ' + d.dup;
+      if (d.ai_used && d.ai_fields && d.ai_fields.length) {
+        msg += '　AI 认出了 ' + d.ai_fields.length + ' 个列名';
+      }
+      toast(msg);
       load();
     });
 
@@ -798,10 +902,27 @@
     const hash = (location.hash || '').replace('#', '');
     S.page = PAGE_META[hash] ? hash : 'todo';
     load(S.page);
-    setTimeout(() => {
-      const t = $('#sync-state');
-      if (t && !API.ready()) t.textContent = '预览模式（未连接后端）';
-    }, 300);
+    waitBridge(40);   // pywebviewready 不保证触发，自己轮询更可靠
+  }
+
+  /* 桥接就绪后必须重载一次：否则首屏可能停在 mock 假数据上。
+     pywebview 注入窗口对象和注入 api 方法之间有时间差，所以用 summary()
+     探一次真，确认后端真的答得上话再加载。 */
+  async function waitBridge(tries) {
+    const t = document.getElementById('sync-state');
+    if (API.ready()) {
+      const probe = await API.summary();
+      if (probe.ok) {
+        if (t) t.textContent = '已同步';
+        load(S.page);
+        return;
+      }
+    }
+    if (tries <= 0) {
+      if (t) t.textContent = '未连接后端（预览模式）';
+      return;
+    }
+    setTimeout(() => waitBridge(tries - 1), 150);
   }
 
   if (document.readyState === 'loading')

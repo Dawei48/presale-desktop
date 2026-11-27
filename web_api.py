@@ -295,12 +295,119 @@ class WebApi:
                 key = (kiln, name)
                 if key not in seen:
                     seen[key] = {
-                        "kiln": kiln, "name": name,
+                        "id": p["id"], "kiln": kiln, "name": name,
                         "notes": p.get("notes") or "",
+                        "image_path": p.get("image_path") or "",
+                        "thumb": self._thumb(p.get("image_path") or ""),
                         "order_count": 0,
                     }
                 seen[key]["order_count"] += 1
             return {"ok": True, "data": list(seen.values())}
+        except Exception as e:
+            return _err(e)
+
+    @staticmethod
+    def _thumb(path, size=96):
+        """WebView2 不允许 file:// 页面读本地文件（实测三个路径全 FAILED），
+        所以缩略图一律转成 base64 data URL 传给前端。"""
+        if not path or not os.path.exists(path):
+            return ""
+        try:
+            import base64
+            import io
+            from PIL import Image
+            img = Image.open(path)
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+            img.thumbnail((size * 2, size * 2), Image.LANCZOS)
+            buf = io.BytesIO()
+            img.save(buf, "JPEG", quality=82, optimize=True)
+            return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
+        except Exception:
+            return ""
+
+    def fetch_images(self, goods_name):
+        """按商品名搜网图，返回候选（不落库，等用户挑）。"""
+        try:
+            from utils.image_fetcher import build_keyword, search_images
+            kw = build_keyword(goods_name)
+            items = search_images(kw, 12)
+            if not items:
+                return {"ok": False, "error": f"没搜到「{kw}」的图，换个更具体的词试试"}
+            return {"ok": True, "data": {"keyword": kw, "items": items[:9]}}
+        except Exception as e:
+            return {"ok": False, "error": f"搜图失败（网络或限流）：{e}"}
+
+    def apply_image(self, product_id, url, goods_name=""):
+        """下载选中的图 → 压到 900px → 写到商品。只改这一条，不动别的。"""
+        try:
+            from utils.image_fetcher import download_to
+            from config import IMAGES_DIR
+            if not url:
+                return {"ok": False, "error": "没有图片地址"}
+            path = download_to(url, IMAGES_DIR)
+            if product_id:
+                self.db.update_product(int(product_id), image_path=path)
+                self.db.log("找图", f"商品 {product_id} 写入新图")
+            else:
+                # 没有 id（商品库聚合行）时按名字找
+                for p in self.db.get_products():
+                    if p.get("name") == goods_name:
+                        self.db.update_product(p["id"], image_path=path)
+                        break
+            return {"ok": True, "data": {"path": path}}
+        except Exception as e:
+            return _err(e)
+
+    def kilns(self):
+        """按窑口聚合：这个窑口有哪些商品、各多少单、待生产多少件。
+        窑口取商品名的第一段（「玉柏 · 青花 · 盖碗」→ 玉柏）。"""
+        try:
+            orders = self._all_orders()
+            buckets = {}
+
+            def bucket(kiln):
+                if kiln not in buckets:
+                    buckets[kiln] = {"name": kiln, "products": {}, "orders": 0, "pending": 0}
+                return buckets[kiln]
+
+            for o in orders:
+                raw = (o.get("goods_name") or o.get("product_name") or "未命名商品").strip()
+                parts = [x.strip() for x in raw.split("·") if x.strip()]
+                kiln = parts[0] if len(parts) > 1 else "未标注窑口"
+                product = " · ".join(parts[1:]) if len(parts) > 1 else raw
+
+                b = bucket(kiln)
+                b["orders"] += 1
+                item = b["products"].setdefault(product, {
+                    "name": product, "orders": 0, "pending": 0, "specs": set(),
+                })
+                item["orders"] += 1
+                if o["status"] in ("confirm", "producing"):
+                    item["pending"] += int(o.get("quantity") or 1)
+                    b["pending"] += int(o.get("quantity") or 1)
+                if o.get("spec"):
+                    item["specs"].add(o["spec"])
+
+            out = []
+            for b in buckets.values():
+                prods = []
+                for it in b["products"].values():
+                    prods.append({
+                        "name": it["name"],
+                        "orders": it["orders"],
+                        "pending": it["pending"],
+                        "specs": sorted(it["specs"]),
+                    })
+                prods.sort(key=lambda x: (-x["pending"], -x["orders"]))
+                out.append({
+                    "name": b["name"],
+                    "orders": b["orders"],
+                    "pending": b["pending"],
+                    "products": prods,
+                })
+            out.sort(key=lambda x: (-x["pending"], -x["orders"]))
+            return {"ok": True, "data": out}
         except Exception as e:
             return _err(e)
 
@@ -334,9 +441,10 @@ class WebApi:
                 rows = [r for r in rows if r["id"] in idset]
             if kiln:
                 rows = [r for r in rows
-                        if (r.get("goods_name") or "").split("·")[0].strip() == kiln]
+                        if (r.get("goods_name") or "").split("·")[0].strip() == kiln
+                        and r["status"] == "producing"]
             if not rows:
-                return {"ok": False, "error": "没有可导出的订单"}
+                return {"ok": False, "error": "这个窑口还没有「客户已同意延发」的单，先确认延发再导出"}
 
             default = f"{kiln or '全部'}_生产单_{datetime.now():%Y%m%d}.docx"
             path = self._ask_save(default)
