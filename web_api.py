@@ -238,6 +238,18 @@ class WebApi:
         except Exception as e:
             return _err(e)
 
+    def apply_local_image(self, product_id, path):
+        """手工选的本地图直接挂到商品上（找图的兜底）。"""
+        try:
+            if not path or not os.path.exists(path):
+                return {"ok": False, "error": "文件不存在"}
+            if product_id:
+                self.db.update_product(int(product_id), image_path=path)
+                self.db.log("上传图", f"商品 {product_id}")
+            return {"ok": True, "data": {"path": path}}
+        except Exception as e:
+            return _err(e)
+
     def delete_product(self, pid):
         try:
             self.db.delete_product(int(pid))

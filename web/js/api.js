@@ -57,6 +57,7 @@
     kilns:          ()              => call('kilns'),
     fetchImages:    (name)          => call('fetch_images', name),
     applyImage:     (pid, url, nm)  => call('apply_image', pid, url, nm || ''),
+    applyLocalImage: (pid, path)    => call('apply_local_image', pid, path),
     products:       (kw)            => call('products', kw || ''),
     imports:        ()              => call('imports'),
     getSettings:    ()              => call('get_settings'),

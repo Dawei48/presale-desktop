@@ -101,6 +101,7 @@
     pick_image: async () => ({ ok: false, error: '浏览器预览模式无法选文件' }),
     fetch_images: async () => ({ ok: false, error: '浏览器预览模式无法联网搜图，请用 exe' }),
     apply_image: async () => ({ ok: false, error: '浏览器预览模式无法保存图片' }),
+    apply_local_image: async () => ({ ok: false, error: '浏览器预览模式无法选文件' }),
     export_production: async () => ({ ok: true, data: { count: 3, path: '' } }),
     import_csv: async () => ({ ok: false, error: '浏览器预览模式无法导入' }),
     kilns: async () => {

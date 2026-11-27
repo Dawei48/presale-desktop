@@ -432,6 +432,19 @@
       const b = el('button', 'act', p.thumb ? '换图' : '找图');
       b.addEventListener('click', () => openImagePicker(p));
       acts.appendChild(b);
+
+      const up = el('button', 'act', '上传');
+      up.addEventListener('click', async () => {
+        up.disabled = true;
+        const pick = await API.pickImage();
+        up.disabled = false;
+        if (!pick.ok) return toast(pick.error || '没选文件', 'warn');
+        const r2 = await API.applyLocalImage(p.id, pick.data.path);
+        if (!r2.ok) return toast(r2.error || '保存失败', 'warn');
+        toast('已换成本地这张图');
+        load();
+      });
+      acts.appendChild(up);
       r.appendChild(acts);
 
       grp.appendChild(r);
