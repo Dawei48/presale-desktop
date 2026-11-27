@@ -98,7 +98,7 @@ def main():
 
     print("\n[7] 导出")
     out = os.path.join(tempfile.gettempdir(), "fx_selfcheck.docx")
-    from utils.docx_export_pro import export_production_docx
+    from utils.docx_export_slip import export_production_docx
     presale = [x for x in rows if x["order_type"] == "presale"]
     n = export_production_docx("玉柏", presale, out)
     check("docx 生成", os.path.exists(out) and os.path.getsize(out) > 5000,
@@ -111,7 +111,15 @@ def main():
     check("表格存在", len(doc.tables) >= 1, "")
     if doc.tables:
         t = doc.tables[0]
-        check("表头 6 列", len(t.columns) == 6, str(len(t.columns)))
+        check("表头 5 列", len(t.columns) == 5, str(len(t.columns)))
+        from docx.oxml.ns import qn as _qn
+        _shd = t.rows[0].cells[0]._tc.tcPr.find(_qn("w:shd"))
+        check("表头有底色", _shd is not None and _shd.get(_qn("w:fill")) == "2B2724",
+              str(_shd is not None and _shd.get(_qn("w:fill"))))
+        _tbl = t._tbl.tblPr.find(_qn("w:tblBorders"))
+        check("表格有框线", _tbl is not None and
+              _tbl.find(_qn("w:insideV")).get(_qn("w:val")) == "single", "无框线")
+        check("带 logo 图", len(doc.inline_shapes) >= 1, "没有嵌入图片")
         check("数据行 = 品项数", len(t.rows) == n + 1, f"{len(t.rows)} vs {n + 1}")
 
     print("\n[8] CSV 导入（含重复、脏行、GBK）")

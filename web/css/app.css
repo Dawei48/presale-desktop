@@ -69,7 +69,7 @@
 
   --shadow-1:    0 1px 2px rgba(28,26,23,.08);
   --shadow-2:    0 16px 40px -12px rgba(28,26,23,.22), 0 2px 8px rgba(28,26,23,.08);
-  --scrim:       rgba(28,26,23,.3);
+  --scrim:       rgba(28,26,23,.42);
   color-scheme: light;
 }
 
@@ -372,6 +372,13 @@ kbd{
 }
 .drawer-head b{font-size:14px;font-weight:600}
 .drawer-body{flex:1;overflow-y:auto;padding:18px 16px}
+.drawer-body::-webkit-scrollbar{width:9px}
+.drawer-body::-webkit-scrollbar-thumb{
+background:var(--hair-2);border-radius:7px;
+border:3px solid transparent;background-clip:content-box;
+}
+.drawer-body::-webkit-scrollbar-thumb:hover{background:var(--ink-4);
+background-clip:content-box;border:3px solid transparent}
 .drawer-foot{
   flex:0 0 56px;display:flex;align-items:center;gap:8px;
   padding:0 16px;border-top:1px solid var(--hair);
@@ -380,6 +387,7 @@ kbd{
 .kv{display:grid;grid-template-columns:76px minmax(0,1fr);gap:9px 12px;font-size:13px}
 .kv dt{color:var(--ink-4)}
 .kv dd{color:var(--ink);word-break:break-all}
+.kv dd.empty{color:var(--ink-4)}
 .sec-t{font-size:var(--t-micro);color:var(--ink-4);margin:20px 0 8px;
   padding-bottom:6px;border-bottom:1px solid var(--hair)}
 

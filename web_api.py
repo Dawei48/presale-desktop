@@ -83,16 +83,15 @@ class WebApi:
     def _apply_titlebar(self, name):
         try:
             import ctypes
-            from ctypes import wintypes
-
             user32 = ctypes.windll.user32
             dwm = ctypes.windll.dwmapi
-            hwnd = user32.GetParent(self.window.gui.hwnd) if hasattr(self.window, "gui") else None
+            # 用窗口标题找句柄最稳（pywebview 的 gui 对象在不同后端字段不一样）
+            hwnd = user32.FindWindowW(None, "放心预")
             if not hwnd:
                 return
             if name == "light":
                 v = ctypes.c_int(0)
-                caption, border = 0x00FAF9F7, 0x00E6E3DE
+                caption, border = 0x00F7F7F6, 0x00E6E3DE
             else:
                 v = ctypes.c_int(1)
                 caption, border = 0x00110F0E, 0x00201F1E
@@ -229,7 +228,7 @@ class WebApi:
             if not path:
                 return {"ok": False, "error": "已取消"}
 
-            from utils.docx_export_pro import export_production_docx
+            from utils.docx_export_slip import export_production_docx
             count = export_production_docx(kiln or "生产单", rows, path)
             return {"ok": True, "data": {"path": path, "count": count}}
         except Exception as e:

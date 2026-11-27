@@ -301,7 +301,15 @@
   }
   function primaryAction(o) {
     if (o.status === 'confirm')   return { text: '标记已同意', fn: x => setStatus(x, 'producing') };
-    if (o.status === 'producing') return { text: '查看生产单', fn: x => go('production') };
+    if (o.status === 'producing') return { text: '查看生产单', fn: x => {
+      const kiln = String(x.goods_name || '').split('·')[0].trim();
+      go('production');
+      setTimeout(() => {
+        const h = [...document.querySelectorAll('#list .group-head h2')]
+          .find(n => n.textContent.trim() === kiln);
+        if (h) h.closest('.group').scrollIntoView({ block: 'start', behavior: 'smooth' });
+      }, 320);
+    } };
     if (o.status === 'ready')     return { text: '去发货',    fn: x => setStatus(x, 'shipped') };
     if (o.status === 'shipped')   return { text: '标记完成',  fn: x => setStatus(x, 'done') };
     return null;
@@ -453,7 +461,11 @@
     body.textContent = '';
 
     const dl = el('dl', 'kv');
-    const add = (k, v) => { dl.appendChild(el('dt', null, k)); dl.appendChild(el('dd', null, v || '—')); };
+    const add = (k, v) => {
+      dl.appendChild(el('dt', null, k));
+      const has = v !== null && v !== undefined && String(v).trim() !== '';
+      dl.appendChild(el('dd', has ? null : 'empty', has ? String(v) : '未填写'));
+    };
     add('客户', o.receiver_name || o.customer);
     add('电话', o.receiver_phone);
     add('地址', o.receiver_addr);
